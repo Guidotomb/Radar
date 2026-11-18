@@ -1,0 +1,9 @@
+Occasione;Tipo;Variazione % 2025/2024
+Colazione;occasione;-2
+Pausa mattutina;occasione;-5
+Pranzo;occasione;+0,4
+Pausa pomeridiana;occasione;-1
+Aperitivo serale;occasione;-4
+Cena;occasione;-1
+Dopocena e notte;occasione;-1
+Totale mercato fuori casa;totale;-2

@@ -1,0 +1,287 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Gli italiani escono meno: le pause pagano il prezzo più alto – Radar QN</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Libre+Franklin:wght@400;500;600;700&family=Newsreader:opsz,wght@6..72,400;6..72,700&display=swap">
+<link rel="stylesheet" href="../assets/radar.css">
+<style>
+.r-controls { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; margin: 22px 0 0; }
+.r-controls__lab { font-size: 13px; color: var(--ink-2); }
+.r-seg { display: inline-flex; gap: 4px; }
+.r-seg button {
+  font: 500 13px/1 var(--sans); color: var(--ink-2); background: transparent;
+  border: 1px solid var(--rule); border-radius: 2px; padding: 7px 10px; cursor: pointer;
+}
+.r-seg button:hover { color: var(--ink); border-color: var(--grey-4); }
+.r-seg button[aria-pressed="true"] { background: var(--ink); border-color: var(--ink); color: var(--bg); }
+.r-seg button:focus-visible, .row:focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; }
+/* riga di lettura della voce scelta */
+.r-read { display: flex; flex-wrap: wrap; align-items: last baseline; gap: 2px 12px; margin: 18px 0 0; min-height: 40px; }
+.r-read__num { font-size: 34px; line-height: 1; font-weight: 700; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
+.r-read__txt { font-size: 14px; line-height: 1.35; color: var(--ink-2); }
+.r-read__txt b { color: var(--ink); font-weight: 600; }
+/* righe */
+.row { cursor: pointer; outline: none; }
+.row .nm { font-size: 13px; font-weight: 600; fill: var(--ink); }
+.row .ico { fill: none; stroke: var(--ink-2); stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+.row.is-sel .nm { font-weight: 700; }
+.row .val { font-size: 13px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.mkt text { font-size: 12px; font-weight: 700; fill: var(--ink); }
+.mkt line { stroke: var(--ink); stroke-width: 1; stroke-dasharray: 3 3; }
+.zero { stroke: var(--ink-2); stroke-width: 1; shape-rendering: crispEdges; }
+.anno text { font-size: 12px; }
+.r-tiles { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); border: 1px solid var(--rule); border-radius: 2px; margin: 26px 0 0; }
+.r-tile { padding: 14px 16px 16px; border-left: 1px solid var(--rule); }
+.r-tile:first-child { border-left: 0; }
+.r-tile__head { font-size: 13px; line-height: 1.35; color: var(--ink-2); margin-bottom: 4px; }
+.r-tile__num { font-size: 30px; line-height: 1.05; font-weight: 700; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
+.r-tile__label { font-size: 12px; line-height: 1.35; color: var(--ink-2); margin-top: 4px; }
+@media (max-width: 519px) {
+  .r-tiles { grid-template-columns: 1fr; }
+  .r-tile { border-left: 0; border-top: 1px solid var(--rule); padding: 12px 14px 13px; }
+  .r-tile:first-child { border-top: 0; }
+  .r-tile__num { font-size: 26px; }
+  .r-read__num { font-size: 30px; }
+}
+</style>
+<script src="https://cdn.jsdelivr.net/npm/d3@7"></script>
+<script src="../assets/radar.js"></script>
+</head>
+<body>
+<main class="radar">
+  <header>
+    <h1 class="r-title">Gli italiani escono meno: le pause pagano il prezzo più alto</h1>
+    <p class="r-sub">Nel 2025 le visite nei locali sono diminuite del 2%, soprattutto nelle pause mattutine e negli aperitivi serali.</p>
+  </header>
+
+  <div class="r-controls">
+    <span class="r-controls__lab" id="ord-lab">Ordina per</span>
+    <div class="r-seg" role="group" aria-labelledby="ord-lab" id="ctl-order">
+      <button type="button" data-order="day" aria-pressed="true">Momento della giornata</button>
+      <button type="button" data-order="val" aria-pressed="false">Variazione</button>
+    </div>
+  </div>
+
+  <div class="r-read" id="read" aria-live="polite">
+    <span class="r-read__num" id="read-num">&nbsp;</span>
+    <span class="r-read__txt" id="read-txt"></span>
+  </div>
+
+  <figure class="r-chart" id="chart" style="margin-top:8px"></figure>
+
+  <div class="r-tiles" id="tiles"></div>
+
+  <p class="r-note"><b>Nota metodologica.</b> Le variazioni riguardano le visite nell'intero mercato dei consumi alimentari fuori casa, non soltanto nei bar. Sono variazioni del 2025 rispetto al 2024, con i decimali indicati dalla fonte. I dati misurano quanto sono cambiate le visite, non il perché: non permettono di attribuire il calo a una causa precisa.</p>
+
+  <footer class="r-foot">
+    <span>Fonte: FIPE–TradeLab, <i>Rapporto Ristorazione 2026</i>, p. 110</span>
+    <span>Elaborazione Radar – QN</span>
+  </footer>
+</main>
+
+<script>
+Radar.loadCSV("../data/visite-occasioni.csv").then(function (csv) {
+  var R = Radar, fmt = R.fmt;
+  var COL = "Variazione % 2025/2024";
+  // decimali come nel CSV: "-5" resta −5%, "+0,4" resta +0,4%
+  function decOf(s) { var m = /,(\d+)/.exec(s); return m ? m[1].length : 0; }
+  function sgn(v, dec) { return (v > 0 ? "+" : "") + fmt(v, dec) + "%"; }
+  function pts(v) { var a = Math.abs(v); return fmt(a, a % 1 ? 1 : 0) + (a === 1 ? " punto" : " punti"); }
+
+  var occ = csv.filter(function (r) { return r["Tipo"] === "occasione"; }).map(function (r, i) {
+    return { k: "o" + i, day: i, name: r["Occasione"], v: R.num(r[COL]), dec: decOf(r[COL]) };
+  });
+  var totRow = csv.find(function (r) { return r["Tipo"] === "totale"; });
+  var MKT = R.num(totRow[COL]), mktDec = decOf(totRow[COL]);
+  occ.forEach(function (d) { d.txt = sgn(d.v, d.dec); d.gap = Math.round((d.v - MKT) * 10) / 10; });
+
+  // colori: peggio del mercato in rosso (il fenomeno), come il mercato o meglio ma in calo in grigio, in crescita in blu
+  var worst = occ.reduce(function (a, b) { return b.v < a.v ? b : a; });
+  occ.forEach(function (d) {
+    d.col = d === worst ? "var(--red)" : d.v < MKT ? "var(--red-4)" : d.v < 0 ? "var(--grey-3)" : "var(--blue)";
+    d.txtCol = d.v < MKT ? "var(--red)" : d.v > 0 ? "var(--blue)" : "var(--ink)";
+  });
+  var lunch = occ.find(function (d) { return d.v > 0; });
+
+  // icone condivise con "La giornata del bar italiano"
+  var ICON = {
+    "Colazione": "M5 9h11v4a5 5 0 0 1-5 5h-1a5 5 0 0 1-5-5zM16 10h1.5a2.5 2.5 0 0 1 0 5H16M3 21h16M9 3c-1 1.2 1 2.2 0 3.4M12.5 3c-1 1.2 1 2.2 0 3.4",
+    "Pausa mattutina": "M8.5 5v14M15.5 5v14",
+    "Pausa pomeridiana": "M8.5 5v14M15.5 5v14",
+    "Pranzo": "M7 3v7a2 2 0 0 0 4 0V3M9 12v9M16.5 21V3c-2 1.5-3 4-3 7h3",
+    "Aperitivo serale": "M4 4h16l-8 9zM12 13v7M8 20h8M15 4l3-2",
+    "Cena": "M12 4a8 8 0 1 0 0 16a8 8 0 1 0 0-16zM12 8a4 4 0 1 0 0 8a4 4 0 1 0 0-8z",
+    "Dopocena e notte": "M19 14.5A8 8 0 0 1 9.5 5a7 7 0 1 0 9.5 9.5zM17 4v3M15.5 5.5h3"
+  };
+
+  var order = "day", selected = null, hovered = null;
+  function ordered() {
+    var a = occ.slice();
+    if (order === "val") a.sort(function (p, q) { return p.v - q.v || p.day - q.day; });
+    else a.sort(function (p, q) { return p.day - q.day; });
+    return a;
+  }
+
+  // ---------- Riga di lettura ----------
+  function cmpTxt(d) {
+    if (d.gap === 0) return "come il mercato complessivo (" + sgn(MKT, mktDec) + ")";
+    return pts(d.gap) + (d.gap < 0 ? " peggio" : " meglio") + " del mercato complessivo (" + sgn(MKT, mktDec) + ")";
+  }
+  function readout() {
+    var d = occ.find(function (o) { return o.k === (hovered || selected); });
+    if (!d) {
+      d3.select("#read-num").text(sgn(MKT, mktDec)).style("color", "var(--ink)");
+      d3.select("#read-txt").html("<b>Mercato fuori casa</b> · visite 2025 sul 2024. Seleziona un'occasione per confrontarla");
+    } else {
+      d3.select("#read-num").text(d.txt).style("color", d.txtCol);
+      d3.select("#read-txt").html("<b>" + d.name + "</b> · " + cmpTxt(d));
+    }
+  }
+
+  // ---------- Riquadri ----------
+  var mattina = occ.find(function (d) { return d.name === "Pausa mattutina"; });
+  var aper = occ.find(function (d) { return d.name === "Aperitivo serale"; });
+  var tiles = [
+    { head: "Pause mattutine", d: mattina, col: "var(--red)", sub: "visite 2025 sul 2024, il calo più forte" },
+    { head: "Aperitivi serali", d: aper, col: "var(--red)", sub: pts(aper.gap) + " peggio del mercato" },
+    { head: "Pranzi", d: lunch, col: "var(--blue)", sub: "l'unica occasione in crescita" }
+  ];
+  var tileSel = d3.select("#tiles").selectAll("div").data(tiles).join("div").attr("class", "r-tile");
+  tileSel.append("div").attr("class", "r-tile__head").text(function (t) { return t.head; });
+  tileSel.append("div").attr("class", "r-tile__num").style("color", function (t) { return t.col; }).text(function (t) { return t.d.txt; });
+  tileSel.append("div").attr("class", "r-tile__label").text(function (t) { return t.sub; });
+  if (!R.reduced) tileSel.select(".r-tile__num").text(function (t) { return sgn(0, t.d.dec); });
+  R.onFirstView(document.getElementById("tiles"), function () {
+    tileSel.select(".r-tile__num").each(function (t) { R.countUp(d3.select(this), t.d.v, function (v) { return sgn(v, t.d.dec); }, "play"); });
+  });
+
+  // ---------- Controlli ----------
+  d3.selectAll("#ctl-order button").on("click", function () {
+    var o = this.getAttribute("data-order");
+    if (o === order) return;
+    order = o;
+    d3.selectAll("#ctl-order button").attr("aria-pressed", function () { return this.getAttribute("data-order") === order; });
+    reorder(true);
+  });
+
+  // ---------- Grafico ----------
+  var host = document.getElementById("chart");
+  var tip = R.tooltip(host);
+  R.dismissOutside(host, function () { tip.hide(); hovered = null; highlight(); });
+  function highlight() {
+    var k = hovered || selected;
+    d3.select(host).selectAll(".row").classed("is-dimmed", function (d) { return k && d.k !== k; })
+      .classed("is-sel", function (d) { return d.k === selected; }).attr("aria-pressed", function (d) { return d.k === selected; });
+    readout();
+  }
+  function select(k) { selected = selected === k ? null : k; highlight(); }
+
+  var reorder = function () {};
+  R.responsive(host, function (W, phase) {
+    var narrow = R.isNarrow(W);
+    var TOP = 30, ROW = narrow ? 50 : 46, BAR = narrow ? 16 : 18;
+    var H = TOP + occ.length * ROW + 6;
+    var x = d3.scaleLinear().domain([-6, narrow ? 3 : 3.6]).range([0, W]);
+    var x0 = Math.round(x(0)) + 0.5;
+    var y = function (i) { return TOP + i * ROW; };
+
+    d3.select(host).select("svg").remove();
+    var svg = d3.select(host).insert("svg", ".r-tip").attr("width", W).attr("height", H).attr("role", "img")
+      .attr("aria-label", "Variazione delle visite nel mercato dei consumi alimentari fuori casa, 2025 sul 2024: " +
+        occ.map(function (d) { return d.name.toLowerCase() + " " + d.txt; }).join(", ") + ". Mercato complessivo " + sgn(MKT, mktDec) + ".");
+    svg.append("title").text("Visite per occasione di consumo, variazione 2025 sul 2024");
+
+    // linea dello zero e linea del mercato, con etichetta in alto
+    svg.append("line").attr("class", "zero").attr("x1", x0).attr("x2", x0).attr("y1", TOP - 8).attr("y2", H);
+    svg.append("text").attr("class", "tick-label").attr("x", x0).attr("y", 12).attr("text-anchor", "middle").text("0");
+    var mk = svg.append("g").attr("class", "mkt");
+    var xm = Math.round(x(MKT)) + 0.5;
+    mk.append("line").attr("x1", xm).attr("x2", xm).attr("y1", TOP - 8).attr("y2", H);
+    mk.append("text").attr("x", xm).attr("y", 12).attr("text-anchor", "middle").text((narrow ? "Mercato " : "Mercato fuori casa ") + sgn(MKT, mktDec));
+
+    var rows = svg.selectAll("g.row").data(ordered(), function (d) { return d.k; }).join("g").attr("class", "row mark")
+      .attr("transform", function (d, i) { return "translate(0," + y(i) + ")"; })
+      .attr("tabindex", 0).attr("role", "button").attr("aria-label", function (d) { return d.name + " " + d.txt + ", " + cmpTxt(d); })
+      .on("click", function (e, d) { select(d.k); })
+      .on("keydown", function (e, d) { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); select(d.k); } });
+    rows.append("rect").attr("class", "hit").attr("x", 0).attr("width", W).attr("y", 0).attr("height", ROW - 2)
+      .on("pointerenter pointermove pointerdown", function (e, d) {
+        hovered = d.k; highlight();
+        var p = d3.pointer(e, host);
+        tip.show(R.tipHTML({ title: d.name, value: d.txt, unit: "visite",
+          rows: [["Mercato fuori casa", sgn(MKT, mktDec)], ["Differenza", d.gap === 0 ? "nessuna" : (d.gap > 0 ? "+" : "−") + pts(d.gap)]],
+          note: "Consumi fuori casa nel complesso, non solo bar" }), p[0], p[1]);
+      })
+      .on("pointerleave", function (e) { if (e.pointerType === "mouse") { tip.hide(); hovered = null; highlight(); } });
+
+    // nome sopra la barra, allineato a sinistra, con l'icona dell'occasione
+    rows.append("path").attr("class", "ico").attr("d", function (d) { return ICON[d.name] || ""; }).attr("transform", "translate(0,3) scale(0.7)");
+    rows.append("text").attr("class", "nm").attr("x", 23).attr("y", 15).text(function (d) { return d.name; });
+    var by = narrow ? 24 : 24;
+    var bars = rows.append("path").style("fill", function (d) { return d.col; });
+    function barD(d, t) {
+      var xv = x(d.v * t), a = Math.min(xv, x0 - 0.5), w = Math.abs(xv - (x0 - 0.5));
+      if (d.v >= 0) return R.barPathH(x0 + 0.5, by, Math.max(0, xv - x0 - 0.5), BAR, 2);
+      // barra verso sinistra: angoli smussati sul lato libero (sinistro)
+      var r = Math.min(2, w, BAR / 2);
+      return "M" + (x0 - 0.5) + "," + by + "H" + (a + r) + "Q" + a + "," + by + " " + a + "," + (by + r) +
+        "V" + (by + BAR - r) + "Q" + a + "," + (by + BAR) + " " + (a + r) + "," + (by + BAR) + "H" + (x0 - 0.5) + "Z";
+    }
+    var vals = rows.append("text").attr("class", "val").attr("y", by + BAR / 2).attr("dy", "0.35em")
+      .attr("text-anchor", function (d) { return d.v < 0 ? "end" : "start"; })
+      .style("fill", function (d) { return d.txtCol; });
+    function setT(t) {
+      bars.attr("d", function (d) { return barD(d, t); });
+      vals.attr("x", function (d) { return d.v < 0 ? x(d.v * t) - 6 : x(d.v * t) + 6; })
+        .text(function (d) { return sgn(d.v * t, d.dec); });
+    }
+
+    // annotazioni (max due), agganciate alla barra con un filo e un pallino
+    var anno = svg.append("g").attr("class", "anno mark");
+    function placeAnno() {
+      anno.selectAll("*").remove();
+      var list = ordered();
+      // testo sulla riga della barra, dalla parte dello zero che resta libera
+      [[worst, (narrow ? pts(worst.gap) + " sotto il mercato" : "Il calo più forte: " + pts(worst.gap) + " peggio del mercato")], [lunch, narrow ? "L'unica in crescita" : "L'unica occasione in crescita"]].forEach(function (a) {
+        var d = a[0], i = list.indexOf(d), yy = y(i) + by + BAR / 2, neg = d.v < 0;
+        var x1 = neg ? x0 + 6 : x0 - 6, x2 = neg ? x0 + 16 : x0 - 16;
+        anno.append("circle").attr("cx", x1).attr("cy", yy).attr("r", 2);
+        anno.append("line").attr("x1", x1).attr("x2", x2).attr("y1", yy).attr("y2", yy);
+        var tx = anno.append("text").attr("x", neg ? x2 + 4 : x2 - 4).attr("y", yy).attr("dy", "0.35em")
+          .attr("text-anchor", neg ? "start" : "end").text(a[1]);
+        var room = neg ? W - x2 - 6 : x2 - 6;
+        if (tx.node().getComputedTextLength() > room) {
+          tx.attr("dy", null).attr("y", yy - 3);
+          R.wrap(tx, room, 1.15);
+        }
+      });
+    }
+
+    reorder = function (animate) {
+      var list = ordered();
+      var t = rows.data(list, function (d) { return d.k; });
+      var dur = animate && !R.reduced ? 600 : 0;
+      rows.transition().duration(dur).ease(d3.easeCubicInOut)
+        .attr("transform", function (d) { return "translate(0," + y(list.indexOf(d)) + ")"; });
+      anno.style("opacity", 0); placeAnno();
+      anno.transition().delay(dur).duration(200).style("opacity", null);
+    };
+    placeAnno();
+
+    if (phase === "pre") { setT(0); anno.style("opacity", 0); }
+    else if (phase === "play" && !R.reduced) {
+      setT(0); anno.style("opacity", 0);
+      svg.transition().duration(R.DUR).ease(R.EASE).tween("bars", function () { return setT; })
+        .on("end", function () { anno.transition().duration(250).style("opacity", null); });
+    } else setT(1);
+    tip.hide();
+    highlight();
+  });
+}).catch(function (err) { Radar.fail(document.getElementById("chart"), err); });
+</script>
+</body>
+</html>
