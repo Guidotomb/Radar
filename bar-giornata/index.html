@@ -1,0 +1,265 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>La giornata del bar italiano – Radar QN</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Libre+Franklin:wght@400;500;600;700&family=Newsreader:opsz,wght@6..72,400;6..72,700&display=swap">
+<link rel="stylesheet" href="../assets/radar.css">
+<style>
+/* pannello della tappa scelta */
+.r-panel { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: end; gap: 6px 18px; margin: 24px 0 0; min-height: 76px; }
+.r-panel__num { font-size: 64px; line-height: 0.9; font-weight: 700; letter-spacing: -0.035em; color: var(--blue); font-variant-numeric: tabular-nums; }
+.r-panel__name { font-family: var(--serif); font-size: 24px; font-weight: 700; line-height: 1.1; color: var(--title); }
+.r-panel__txt { font-size: 14px; line-height: 1.4; color: var(--ink-2); margin-top: 3px; }
+.r-nav { display: flex; align-items: center; gap: 6px; }
+.r-nav button {
+  font: 500 13px/1 var(--sans); color: var(--ink); background: transparent; cursor: pointer;
+  border: 1px solid var(--rule); border-radius: 2px; width: 34px; height: 34px;
+}
+.r-nav button:hover:not(:disabled) { border-color: var(--grey-4); }
+.r-nav button:disabled { color: var(--grey-4); cursor: default; }
+.r-nav button:focus-visible, .stop:focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; }
+.r-nav span { font-size: 12px; color: var(--ink-2); min-width: 44px; text-align: center; font-variant-numeric: tabular-nums; }
+@media (max-width: 519px) {
+  .r-panel { grid-template-columns: auto minmax(0, 1fr); }
+  .r-panel__num { font-size: 52px; }
+  .r-panel__name { font-size: 21px; }
+  .r-nav { grid-column: 1 / -1; justify-content: flex-start; }
+}
+/* tappe */
+.stop { cursor: pointer; outline: none; }
+.stop .dot { transition: fill 200ms ease, stroke 200ms ease; }
+.stop .ico { fill: none; stroke: var(--ink-2); stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; transition: stroke 200ms ease; }
+.stop.is-on .ico { stroke: var(--blue); }
+.stop .nm { font-size: 13px; font-weight: 500; fill: var(--ink-2); }
+.stop.is-on .nm { font-weight: 700; fill: var(--ink); }
+.stop .pc { font-size: 13px; font-weight: 700; fill: var(--ink); }
+.stop.is-on .pc { fill: var(--blue); }
+.end-lab { font-size: 12px; fill: var(--ink-2); letter-spacing: 0.02em; }
+/* cento visite */
+.r-cells__cap { font-size: 14px; line-height: 1.4; margin: 26px 0 8px; }
+.r-cells__cap b { color: var(--blue); }
+.r-cells { display: grid; grid-template-columns: repeat(25, minmax(0, 1fr)); gap: 3px; }
+.r-cells i { display: block; aspect-ratio: 1; border-radius: 2px; background: var(--grey-5); transition: background 250ms ease; cursor: pointer; }
+.r-cells i.is-on { background: var(--blue); }
+@media (max-width: 519px) { .r-cells { grid-template-columns: repeat(20, minmax(0, 1fr)); gap: 2px; } }
+/* riquadri */
+.r-tiles { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); border: 1px solid var(--rule); border-radius: 2px; margin: 28px 0 0; }
+.r-tile { padding: 14px 16px 16px; border-left: 1px solid var(--rule); }
+.r-tile:first-child { border-left: 0; }
+.r-tile__head { font-size: 13px; line-height: 1.35; color: var(--ink-2); margin-bottom: 4px; }
+.r-tile__num { font-size: 30px; line-height: 1.05; font-weight: 700; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
+.r-tile__num.is-main { color: var(--blue); }
+.r-tile__label { font-size: 12px; line-height: 1.35; color: var(--ink-2); margin-top: 4px; }
+@media (max-width: 519px) {
+  .r-tiles { grid-template-columns: 1fr; }
+  .r-tile { border-left: 0; border-top: 1px solid var(--rule); padding: 12px 14px 13px; }
+  .r-tile:first-child { border-top: 0; }
+  .r-tile__num { font-size: 26px; }
+}
+@media (prefers-reduced-motion: reduce) { .stop .dot, .stop .ico, .r-cells i { transition: none; } }
+</style>
+<script src="https://cdn.jsdelivr.net/npm/d3@7"></script>
+<script src="../assets/radar.js"></script>
+</head>
+<body>
+<main class="radar">
+  <header>
+    <h1 class="r-title">La giornata del bar italiano</h1>
+    <p class="r-sub">Come si distribuiscono i 5,6 miliardi di visite annuali nei bar italiani.</p>
+  </header>
+
+  <div class="r-panel" id="panel" aria-live="polite">
+    <div class="r-panel__num" id="p-num">&nbsp;</div>
+    <div><div class="r-panel__name" id="p-name">&nbsp;</div><div class="r-panel__txt" id="p-txt">&nbsp;</div></div>
+    <div class="r-nav">
+      <button type="button" id="prev" aria-label="Occasione precedente">←</button>
+      <span id="p-pos"></span>
+      <button type="button" id="next" aria-label="Occasione successiva">→</button>
+    </div>
+  </div>
+
+  <figure class="r-chart" id="chart" style="margin-top:18px"></figure>
+
+  <p class="r-cells__cap" id="cells-cap">&nbsp;</p>
+  <div class="r-cells" id="cells" aria-hidden="true"></div>
+
+  <div class="r-tiles" id="tiles"></div>
+
+  <p class="r-note">Quote delle visite per occasione di consumo, 2025. Le tappe seguono l'ordine della giornata, ma la distanza tra l'una e l'altra non rappresenta il tempo: i dati non sono divisi per ora. L'area dei cerchi è proporzionale alla quota. Le visite in miliardi per occasione sono un calcolo di Radar (quota per 5,6 miliardi), arrotondato a un decimale.</p>
+
+  <footer class="r-foot">
+    <span>Fonte: FIPE, <i>Rapporto Ristorazione 2026</i>, pp. 46-47, su dati TradeLab</span>
+    <span>Elaborazione Radar – QN</span>
+  </footer>
+</main>
+
+<script>
+Promise.all([Radar.loadCSV("../data/bar-giornata.csv"), Radar.loadCSV("../data/bar-giornata-totale.csv")]).then(function (res) {
+  var R = Radar, fmt = R.fmt;
+  var TOT = R.num(res[1][0]["Valore"]);   // miliardi di visite
+  var occ = res[0].map(function (r, i) { return { i: i, name: r["Occasione"], share: R.num(r["Quota %"]) }; });
+  var sum = d3.sum(occ, function (d) { return d.share; });
+  if (sum !== 100) console.warn("Le quote sommano a " + sum);
+  occ.forEach(function (d) { d.bn = TOT * d.share / 100; });
+
+  // icone disegnate a mano (24×24, solo contorno)
+  var ICON = {
+    "Colazione": "M5 9h11v4a5 5 0 0 1-5 5h-1a5 5 0 0 1-5-5zM16 10h1.5a2.5 2.5 0 0 1 0 5H16M3 21h16M9 3c-1 1.2 1 2.2 0 3.4M12.5 3c-1 1.2 1 2.2 0 3.4",
+    "Pause": "M8.5 5v14M15.5 5v14",
+    "Pranzo": "M7 3v7a2 2 0 0 0 4 0V3M9 12v9M16.5 21V3c-2 1.5-3 4-3 7h3",
+    "Aperitivo": "M4 4h16l-8 9zM12 13v7M8 20h8M15 4l3-2",
+    "Cena": "M12 4a8 8 0 1 0 0 16a8 8 0 1 0 0-16zM12 8a4 4 0 1 0 0 8a4 4 0 1 0 0-8z",
+    "Dopocena e notte": "M19 14.5A8 8 0 0 1 9.5 5a7 7 0 1 0 9.5 9.5zM17 4v3M15.5 5.5h3"
+  };
+  function pct(v) { return fmt(v, 0) + "%"; }
+  function bnTxt(v) { return fmt(v, 1) + " miliardi"; }
+
+  var cur = 0;
+
+  // ---------- Griglia delle cento visite ----------
+  var cellData = [];
+  occ.forEach(function (d) { for (var j = 0; j < d.share; j++) cellData.push(d); });
+  var cells = d3.select("#cells").selectAll("i").data(cellData).join("i")
+    .attr("title", function (d) { return d.name + ": " + pct(d.share); })
+    .on("click", function (e, d) { select(d.i); });
+
+  // ---------- Riquadri ----------
+  var colaz = occ.find(function (d) { return d.name === "Colazione"; });
+  var pause = occ.find(function (d) { return d.name === "Pause"; });
+  var tiles = [
+    { head: "Visite annuali nei bar", v: TOT, f: function (v) { return fmt(v, 1) + " miliardi"; }, sub: "2025" },
+    { head: "Tra colazione e pause", v: colaz.share + pause.share, f: pct, cls: "is-main", sub: pct(colaz.share) + " colazione, " + pct(pause.share) + " pause" },
+    { head: "Colazione", v: colaz.share, f: pct, cls: "is-main", sub: "la prima occasione di visita al bar" }
+  ];
+  var tileSel = d3.select("#tiles").selectAll("div").data(tiles).join("div").attr("class", "r-tile");
+  tileSel.append("div").attr("class", "r-tile__head").text(function (d) { return d.head; });
+  tileSel.append("div").attr("class", function (d) { return "r-tile__num " + (d.cls || ""); }).text(function (d) { return d.f(d.v); });
+  tileSel.append("div").attr("class", "r-tile__label").text(function (d) { return d.sub; });
+  if (!R.reduced) tileSel.select(".r-tile__num").text(function (d) { return d.f(0); });
+  R.onFirstView(document.getElementById("tiles"), function () {
+    tileSel.select(".r-tile__num").each(function (d) { R.countUp(d3.select(this), d.v, d.f, "play"); });
+  });
+
+  // ---------- Pannello ----------
+  var pNum = d3.select("#p-num"), lastShare = 0, entered = R.reduced;
+  function updatePanel(animate) {
+    var d = occ[cur];
+    d3.select("#p-name").text(d.name);
+    d3.select("#p-txt").text("delle visite nei bar · circa " + bnTxt(d.bn) + " all'anno");
+    d3.select("#p-pos").text((cur + 1) + " di " + occ.length);
+    d3.select("#prev").property("disabled", cur === 0);
+    d3.select("#next").property("disabled", cur === occ.length - 1);
+    var from = lastShare; lastShare = d.share;
+    if (!entered) { pNum.text(pct(0)); return; }
+    if (!animate || R.reduced) { pNum.interrupt().text(pct(d.share)); return; }
+    pNum.interrupt().transition().duration(380).ease(R.EASE).tween("text", function () {
+      var node = this, it = d3.interpolateNumber(from, d.share);
+      return function (t) { node.textContent = pct(it(t)); };
+    });
+    d3.select("#cells-cap").html("Su 100 visite al bar, <b>" + fmt(d.share, 0) + "</b> " + (d.share === 1 ? "è" : "sono") + " per " + capFor(d));
+  }
+  function capFor(d) {
+    return { "Colazione": "la colazione", "Pause": "una pausa", "Pranzo": "il pranzo", "Aperitivo": "l'aperitivo", "Cena": "la cena", "Dopocena e notte": "il dopocena o la notte" }[d.name] || d.name.toLowerCase();
+  }
+  function paint() {
+    var svg = d3.select(host).select("svg");
+    svg.selectAll(".stop").classed("is-on", function (d) { return d.i === cur; }).attr("aria-pressed", function (d) { return d.i === cur; })
+      .select(".dot").style("fill", function (d) { return d.i === cur ? "var(--blue)" : "var(--grey-5)"; })
+      .style("stroke", function (d) { return d.i === cur ? "var(--blue)" : "var(--grey-4)"; });
+    cells.classed("is-on", function (d) { return d.i === cur; });
+    d3.select("#cells-cap").html("Su 100 visite al bar, <b>" + fmt(occ[cur].share, 0) + "</b> sono per " + capFor(occ[cur]));
+  }
+  function select(i) {
+    if (i < 0 || i >= occ.length || i === cur) return;
+    cur = i; updatePanel(true); paint();
+  }
+  d3.select("#prev").on("click", function () { select(cur - 1); });
+  d3.select("#next").on("click", function () { select(cur + 1); });
+
+  // ---------- Timeline ----------
+  var host = document.getElementById("chart");
+  R.responsive(host, function (W, phase) {
+    var narrow = R.isNarrow(W);
+    var rMax = narrow ? 27 : 40;
+    var rs = d3.scaleSqrt().domain([0, d3.max(occ, function (d) { return d.share; })]).range([0, rMax]);   // area ∝ quota
+    var H, pos;
+    if (!narrow) {
+      // orizzontale: mattina a sinistra, notte a destra
+      var padX = 56, lineY = 118;
+      var xs = d3.scalePoint().domain(occ.map(function (d) { return d.i; })).range([padX, W - padX]);
+      pos = function (d) { return [xs(d.i), lineY]; };
+      H = lineY + rMax + 52;
+    } else {
+      // verticale su mobile: dall'alto in basso
+      var top = 34, step = 66, lineX = 34;
+      pos = function (d) { return [lineX, top + rMax / 2 + d.i * step]; };
+      H = top + rMax / 2 + (occ.length - 1) * step + rMax + 26;
+    }
+
+    d3.select(host).select("svg").remove();
+    var svg = d3.select(host).append("svg").attr("width", W).attr("height", H).attr("role", "group")
+      .attr("aria-label", "La giornata del bar in sei occasioni: " + occ.map(function (d) { return d.name + " " + pct(d.share); }).join(", ") + ".");
+    svg.append("title").text("Quote delle visite nei bar per occasione di consumo, 2025");
+
+    // linea della giornata con i due estremi
+    var a = pos(occ[0]), b = pos(occ[occ.length - 1]);
+    if (!narrow) {
+      svg.append("line").attr("x1", 8).attr("x2", W - 8).attr("y1", a[1]).attr("y2", a[1]).style("stroke", "var(--rule)").style("stroke-width", 2);
+      svg.append("text").attr("class", "end-lab").attr("x", 0).attr("y", 12).text("Mattina →");
+      svg.append("text").attr("class", "end-lab").attr("x", W).attr("y", 12).attr("text-anchor", "end").text("Notte");
+    } else {
+      svg.append("line").attr("x1", a[0]).attr("x2", a[0]).attr("y1", 18).attr("y2", H - 4).style("stroke", "var(--rule)").style("stroke-width", 2);
+      svg.append("text").attr("class", "end-lab").attr("x", a[0] + 4).attr("y", 10).attr("text-anchor", "middle").text("Mattina");
+      svg.append("text").attr("class", "end-lab").attr("x", a[0] + 4).attr("y", H).attr("text-anchor", "middle").text("Notte").attr("dy", "-0.1em");
+    }
+
+    var stops = svg.selectAll("g.stop").data(occ).join("g").attr("class", "stop")
+      .attr("transform", function (d) { var p = pos(d); return "translate(" + p[0] + "," + p[1] + ")"; })
+      .attr("tabindex", 0).attr("role", "button")
+      .attr("aria-label", function (d) { return d.name + ", " + pct(d.share) + " delle visite"; })
+      .on("click", function (e, d) { select(d.i); })
+      .on("keydown", function (e, d) {
+        if (e.key === "Enter" || e.key === " ") { e.preventDefault(); select(d.i); }
+        if (e.key === "ArrowRight" || e.key === "ArrowDown") { e.preventDefault(); select(cur + 1); focusCur(); }
+        if (e.key === "ArrowLeft" || e.key === "ArrowUp") { e.preventDefault(); select(cur - 1); focusCur(); }
+      });
+    function focusCur() { var n = svg.selectAll(".stop").filter(function (d) { return d.i === cur; }).node(); if (n) n.focus(); }
+
+    // area cliccabile ampia
+    stops.append("rect").attr("class", "hit")
+      .attr("x", narrow ? -30 : -46).attr("y", narrow ? -30 : -100).attr("width", narrow ? W - 4 : 92).attr("height", narrow ? 60 : 100 + rMax + 50);
+    var dots = stops.append("circle").attr("class", "dot").style("stroke-width", 1.5);
+    // icona: sopra il cerchio su desktop, accanto al nome su mobile
+    stops.append("path").attr("class", "ico").attr("d", function (d) { return ICON[d.name] || ""; })
+      .attr("transform", narrow ? "translate(" + (rMax + 12) + ",-12)" : "translate(-12," + (-rMax - 46) + ")");
+    var nm = stops.append("text").attr("class", "nm");
+    var pc = stops.append("text").attr("class", "pc");
+    if (!narrow) {
+      nm.attr("text-anchor", "middle").attr("y", rMax + 22).text(function (d) { return d.name; });
+      pc.attr("text-anchor", "middle").attr("y", rMax + 40).text(function (d) { return pct(d.share); });
+      // "Dopocena e notte" va a capo per non urtare la tappa vicina
+      nm.filter(function (d) { return d.name.length > 12; }).each(function () { R.wrap(d3.select(this), 84, 1.2); })
+        .each(function () { var n = +this.getAttribute("data-lines"); if (n > 1) d3.select(this.parentNode).select(".pc").attr("y", rMax + 40 + (n - 1) * 15.6); });
+    } else {
+      nm.attr("x", rMax + 44).attr("y", -2).text(function (d) { return d.name; });
+      pc.attr("x", rMax + 44).attr("y", 15).text(function (d) { return pct(d.share); });
+    }
+
+    R.enter(dots, phase,
+      function (s) { s.attr("r", 0); },
+      function (s) { s.attr("r", function (d) { return Math.max(3, rs(d.share)); }); }, 0);
+    if (phase === "play" && !R.reduced) {
+      dots.transition().delay(function (d) { return d.i * 90; }).duration(R.DUR).ease(R.EASE).attr("r", function (d) { return Math.max(3, rs(d.share)); });
+      entered = true; lastShare = 0; updatePanel(true);
+    } else if (phase === "static") { entered = true; updatePanel(false); }
+    else updatePanel(false);
+    paint();
+  });
+}).catch(function (err) { Radar.fail(document.getElementById("chart"), err); });
+</script>
+</body>
+</html>
