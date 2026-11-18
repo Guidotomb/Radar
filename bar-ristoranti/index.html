@@ -97,8 +97,8 @@ Radar.loadCSV("../data/bar-ristoranti.csv").then(function (csv) {
   var rist = rows.find(function (d) { return d.name === "Ristoranti con servizio"; });
   // ruolo di colore: bar in rosso (il fenomeno), ristoranti in blu (il termine di paragone), il resto in grigio
   rows.forEach(function (d) { d.role = d === bar ? "hot" : d === rist ? "main" : "ctx"; });
-  var COL = { hot: "var(--red)", main: "var(--blue)", ctx: "var(--grey-3)" };
-  var WID = { hot: 3, main: 2.5, ctx: 2 };
+  var COL = { hot: "var(--red)", main: "var(--blue)", ctx: "var(--grey-4)" };
+  var WID = { hot: 3.5, main: 3, ctx: 1.5 };
 
   var mode = "abs", prevMode = "abs", selected = null, hovered = null;
 
@@ -172,7 +172,7 @@ Radar.loadCSV("../data/bar-ristoranti.csv").then(function (csv) {
     lastW = W;
     var narrow = R.isNarrow(W);
     var m = { top: 34, right: narrow ? 104 : 200, bottom: 10, left: narrow ? 62 : 70 };
-    var H = narrow ? 380 : 400, w = W - m.left - m.right, h = H - m.top - m.bottom;
+    var H = narrow ? 340 : 350, w = W - m.left - m.right, h = H - m.top - m.bottom;
     var y = yScale(mode, h), yPrev = yScale(phase === "mode" ? prevMode : mode, h);
     var DUR = R.reduced ? 0 : (phase === "mode" ? 650 : 900);
 
@@ -212,9 +212,9 @@ Radar.loadCSV("../data/bar-ristoranti.csv").then(function (csv) {
     var ln = cats.append("line").attr("x1", 0)
       .style("stroke", function (d) { return COL[d.role]; }).style("stroke-width", function (d) { return WID[d.role]; })
       .style("stroke-linecap", "round");
-    var d15 = cats.append("circle").attr("cx", 0).attr("r", 4.5)
+    var d15 = cats.append("circle").attr("cx", 0).attr("r", function (d) { return d.role === "ctx" ? 3.5 : 5; })
       .style("fill", "var(--bg)").style("stroke", function (d) { return COL[d.role]; }).style("stroke-width", 2);
-    var d25 = cats.append("circle").attr("r", function (d) { return d.role === "hot" ? 6 : 5; })
+    var d25 = cats.append("circle").attr("r", function (d) { return d.role === "ctx" ? 4 : 6.5; })
       .style("fill", function (d) { return COL[d.role]; });
 
     // etichette: a sinistra il valore 2015, a destra valore 2025 + nome
@@ -226,7 +226,7 @@ Radar.loadCSV("../data/bar-ristoranti.csv").then(function (csv) {
     var leftL = g.append("g").attr("class", "lab-left").selectAll("text").data(leftItems).join("text")
       .attr("class", function (o) { return "val-label " + (o.d ? "cat-lab" : ""); }).attr("x", -10).attr("y", function (o) { return o.y; })
       .attr("dy", "0.35em").attr("text-anchor", "end")
-      .style("fill", function (o) { return o.d && o.d.role !== "ctx" ? COL[o.d.role] : null; })
+      .style("fill", function (o) { return o.d && o.d.role !== "ctx" ? COL[o.d.role] : "var(--ink-2)"; })
       .text(function (o) { return o.d ? f0(o.d.v15) : "0%"; });
 
     var rightItems = rows.map(function (d) { return { d: d, y: y(v1(d, mode)), h: LH }; });
@@ -234,7 +234,7 @@ Radar.loadCSV("../data/bar-ristoranti.csv").then(function (csv) {
     var rightL = g.append("g").selectAll("text").data(rightItems).join("text").attr("class", "cat-lab")
       .attr("x", w + 10).attr("y", function (o) { return o.y; });
     rightL.each(function (o) {
-      var t = d3.select(this), c = o.d.role !== "ctx" ? COL[o.d.role] : "var(--ink)";
+      var t = d3.select(this), c = o.d.role !== "ctx" ? COL[o.d.role] : "var(--ink-2)";
       var valTxt = mode === "abs" ? f0(o.d.v25) : p1(o.d.pct);
       if (narrow) {
         t.append("tspan").attr("class", "val-label r-val").attr("x", w + 10).attr("dy", "-0.15em").style("fill", c).text(valTxt);

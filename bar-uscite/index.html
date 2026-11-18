@@ -9,7 +9,8 @@
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Libre+Franklin:wght@400;500;600;700&family=Newsreader:opsz,wght@6..72,400;6..72,700&display=swap">
 <link rel="stylesheet" href="../assets/radar.css">
 <style>
-.flow { fill: none; transition: stroke-opacity 180ms ease, opacity 180ms ease; stroke-opacity: 0.38; }
+.flow { fill: none; transition: stroke-opacity 180ms ease, opacity 180ms ease; stroke-opacity: 0.4; }
+.flow.is-lv2 { stroke-opacity: 0.55; }
 .flow.is-hot { stroke-opacity: 0.62; }
 .node { transition: opacity 180ms ease; }
 .clickable { cursor: pointer; }
@@ -104,7 +105,7 @@ Radar.loadCSV("../data/bar-uscite.csv").then(function (csv) {
 
   // ---------- Nota e riquadri ----------
   d3.select("#note").text("Le quote delle destinazioni si riferiscono alle " + f0(ricl.value) +
-    " imprese che hanno cambiato codice ATECO e sommano a " + fmt(shareSum, 1) + "% per gli arrotondamenti: la fonte non pubblica i conteggi per destinazione e lo spessore dei tre flussi è proporzionale alle percentuali. " +
+    " imprese che hanno cambiato codice ATECO e sommano a " + fmt(shareSum, 1) + "% per gli arrotondamenti: la fonte non pubblica i conteggi per destinazione e lo spessore dei tre flussi è proporzionale alle percentuali, ma i flussi più sottili hanno uno spessore minimo di 4 pixel per restare visibili. " +
     "Il cambio di codice ATECO è una riclassificazione amministrativa dell'attività: l'impresa non risulta cessata, ma non è più classificata come bar. Non dice se il locale sia cambiato davvero.");
 
   var tiles = [
@@ -186,7 +187,7 @@ Radar.loadCSV("../data/bar-uscite.csv").then(function (csv) {
     var yy = N.ricl.y;
     dest.forEach(function (d) {
       var h = N.ricl.h * d.share / shareSum;   // proporzionale alla quota
-      N[d.id] = { id: d.id, x: x2, y: yy, h: h, hv: Math.max(2, h), col: d.col, d: d };
+      N[d.id] = { id: d.id, x: x2, y: yy, h: h, hv: Math.max(4, h), col: d.col, d: d };
       yy += h + G2;
     });
     var chartBottom = Math.max(N.ricl.y + N.ricl.h, yy - G2 + 2);
@@ -223,9 +224,9 @@ Radar.loadCSV("../data/bar-uscite.csv").then(function (csv) {
 
     // flussi
     var fl = g.append("g").selectAll("path").data(showLinks).join("path")
-      .attr("class", function (l) { return "flow mark" + (l.t === "ricl" || l.lv2 ? " clickable" : ""); })
+      .attr("class", function (l) { return "flow mark" + (l.lv2 ? " is-lv2" : "") + (l.t === "ricl" || l.lv2 ? " clickable" : ""); })
       .attr("d", linkD).style("stroke", function (l) { return l.col; })
-      .style("stroke-width", function (l) { return Math.max(1.5, l.w); });
+      .style("stroke-width", function (l) { return Math.max(4, l.w); });
 
     // nodi
     var nd = g.append("g").selectAll("rect").data(showNodes).join("rect")

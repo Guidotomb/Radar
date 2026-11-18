@@ -183,7 +183,7 @@ Radar.loadCSV("../data/visite-occasioni.csv").then(function (csv) {
   var reorder = function () {};
   R.responsive(host, function (W, phase) {
     var narrow = R.isNarrow(W);
-    var TOP = 30, ROW = narrow ? 50 : 46, BAR = narrow ? 16 : 18;
+    var TOP = 30, ROW = narrow ? 54 : 52, BAR = narrow ? 24 : 26;
     var H = TOP + occ.length * ROW + 6;
     var x = d3.scaleLinear().domain([-6, narrow ? 3 : 3.6]).range([0, W]);
     var x0 = Math.round(x(0)) + 0.5;
@@ -221,7 +221,7 @@ Radar.loadCSV("../data/visite-occasioni.csv").then(function (csv) {
     // nome sopra la barra, allineato a sinistra, con l'icona dell'occasione
     rows.append("path").attr("class", "ico").attr("d", function (d) { return ICON[d.name] || ""; }).attr("transform", "translate(0,3) scale(0.7)");
     rows.append("text").attr("class", "nm").attr("x", 23).attr("y", 15).text(function (d) { return d.name; });
-    var by = narrow ? 24 : 24;
+    var by = 22;
     var bars = rows.append("path").style("fill", function (d) { return d.col; });
     function barD(d, t) {
       var xv = x(d.v * t), a = Math.min(xv, x0 - 0.5), w = Math.abs(xv - (x0 - 0.5));
