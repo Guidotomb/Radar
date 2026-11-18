@@ -1,0 +1,325 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Non tutti i bar scomparsi hanno chiuso – Radar QN</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Libre+Franklin:wght@400;500;600;700&family=Newsreader:opsz,wght@6..72,400;6..72,700&display=swap">
+<link rel="stylesheet" href="../assets/radar.css">
+<style>
+.flow { fill: none; transition: stroke-opacity 180ms ease, opacity 180ms ease; stroke-opacity: 0.38; }
+.flow.is-hot { stroke-opacity: 0.62; }
+.node { transition: opacity 180ms ease; }
+.clickable { cursor: pointer; }
+.lab text { paint-order: stroke; stroke: var(--bg); stroke-width: 4px; stroke-linejoin: round; }
+.lab .n { font-size: 13px; font-weight: 600; fill: var(--ink); }
+.lab .v { font-size: 12px; fill: var(--ink-2); }
+.lab .v b { font-weight: 700; }
+.r-toggle {
+  font: 500 13px/1 var(--sans); color: var(--ink); background: transparent; cursor: pointer;
+  border: 1px solid var(--rule); border-radius: 2px; padding: 8px 11px; margin: 14px 0 0;
+  display: inline-flex; align-items: center; gap: 8px;
+}
+.r-toggle:hover { border-color: var(--grey-4); }
+.r-toggle[aria-expanded="true"] { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+.r-toggle:focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; }
+.r-toggle .chev { display: inline-block; transition: transform 200ms ease; }
+.r-toggle[aria-expanded="true"] .chev { transform: rotate(90deg); }
+.r-tiles { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); border: 1px solid var(--rule); border-radius: 2px; margin: 24px 0 0; }
+.r-tile { padding: 14px 16px 16px; border-left: 1px solid var(--rule); }
+.r-tile:first-child { border-left: 0; }
+.r-tile__head { font-size: 13px; line-height: 1.35; color: var(--ink-2); margin-bottom: 4px; }
+.r-tile__num { font-size: 30px; line-height: 1.05; font-weight: 700; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
+.r-tile__num.is-hot { color: var(--red); }
+.r-tile__num.is-main { color: var(--blue); }
+.r-tile__label { font-size: 12px; line-height: 1.35; color: var(--ink-2); margin-top: 4px; }
+@media (max-width: 519px) {
+  .r-tiles { grid-template-columns: 1fr; }
+  .r-tile { border-left: 0; border-top: 1px solid var(--rule); padding: 12px 14px 13px; }
+  .r-tile:first-child { border-top: 0; }
+  .r-tile__num { font-size: 26px; }
+}
+@media (prefers-reduced-motion: reduce) { .flow, .node, .r-toggle .chev { transition: none; } }
+</style>
+<script src="https://cdn.jsdelivr.net/npm/d3@7"></script>
+<script src="../assets/radar.js"></script>
+</head>
+<body>
+<main class="radar">
+  <header>
+    <h1 class="r-title">Non tutti i bar scomparsi hanno chiuso</h1>
+    <p class="r-sub">La destinazione delle 10.559 imprese uscite dalla categoria dei bar fra il 2019 e il 2022.</p>
+  </header>
+
+  <button type="button" class="r-toggle" id="toggle" aria-expanded="false" aria-controls="chart">
+    <span class="chev" aria-hidden="true">▸</span><span id="toggle-txt">Mostra le destinazioni dei cambi di ATECO</span>
+  </button>
+
+  <figure class="r-chart" id="chart" style="margin-top:14px"></figure>
+
+  <div class="r-tiles" id="tiles"></div>
+
+  <p class="r-note" id="note"></p>
+
+  <footer class="r-foot">
+    <span>Fonte: FIPE, <i>Rapporto Ristorazione 2026</i>, p. 46, su dati InfoCamere</span>
+    <span>Elaborazione Radar – QN</span>
+  </footer>
+</main>
+
+<script>
+Radar.loadCSV("../data/bar-uscite.csv").then(function (csv) {
+  var R = Radar, fmt = R.fmt;
+  function f0(v) { return fmt(v, 0); }
+  // le quote si mostrano come nel testo della fonte: "1" resta 1%, "95,8" resta 95,8%
+  function q(s) { return String(s).trim() + "%"; }
+
+  // ---------- Dati ----------
+  var lv1 = csv.filter(function (r) { return R.num(r["Imprese"]) != null; });
+  var lv2 = csv.filter(function (r) { return R.num(r["Imprese"]) == null; });
+  var root = { id: "tot", name: lv1[0]["Origine"], value: R.num(lv1[0]["Base"]) };
+  var cess = lv1.find(function (r) { return /Cessazioni/.test(r["Destinazione"]); });
+  var ricl = lv1.find(function (r) { return /ATECO/.test(r["Destinazione"]); });
+  cess = { id: "cess", name: cess["Destinazione"], value: R.num(cess["Imprese"]), qs: cess["Quota %"], base: R.num(cess["Base"]) };
+  ricl = { id: "ricl", name: ricl["Destinazione"], value: R.num(ricl["Imprese"]), qs: ricl["Quota %"], base: R.num(ricl["Base"]) };
+  // controlli di coerenza con i totali e le quote dichiarate
+  if (cess.value + ricl.value !== root.value) console.warn("La somma dei due rami non dà il totale");
+  [cess, ricl].forEach(function (d) {
+    if (Math.round(d.value / d.base * 1000) / 10 !== R.num(d.qs)) console.warn("Quota non coerente:", d.name);
+  });
+  var dest = lv2.map(function (r, i) {
+    return { id: "d" + i, name: r["Destinazione"], share: R.num(r["Quota %"]), qs: r["Quota %"], base: R.num(r["Base"]) };
+  });
+  var shareSum = d3.sum(dest, function (d) { return d.share; });   // 100,1 per gli arrotondamenti
+  // nome breve per l'etichetta; il codice ATECO va sulla riga del valore
+  function dName(d) { return d.name.replace(/\s*\(ATECO [\d.]+\)/, "").replace("Attività ricreative e di intrattenimento", "Attività ricreative e intrattenimento"); }
+  function dCode(d) { var m = /ATECO ([\d.]+)/.exec(d.name); return m ? m[1] : null; }
+  var DCOL = ["var(--blue-2)", "var(--blue-4)", "var(--blue-3)"];
+  dest.forEach(function (d, i) { d.col = DCOL[i] || "var(--blue-3)"; });
+  root.col = "var(--grey-2)"; cess.col = "var(--red)"; ricl.col = "var(--blue)";
+
+  var expanded = false, hovered = null;
+
+  // ---------- Nota e riquadri ----------
+  d3.select("#note").text("Le quote delle destinazioni si riferiscono alle " + f0(ricl.value) +
+    " imprese che hanno cambiato codice ATECO e sommano a " + fmt(shareSum, 1) + "% per gli arrotondamenti: la fonte non pubblica i conteggi per destinazione e lo spessore dei tre flussi è proporzionale alle percentuali. " +
+    "Il cambio di codice ATECO è una riclassificazione amministrativa dell'attività: l'impresa non risulta cessata, ma non è più classificata come bar. Non dice se il locale sia cambiato davvero.");
+
+  var tiles = [
+    { head: "Cessazioni effettive", v: cess.value, f: f0, cls: "is-hot", sub: cess.qs + "% delle " + f0(root.value) + " uscite dalla categoria" },
+    { head: "Riclassificazioni (cambio di codice ATECO)", v: ricl.value, f: f0, cls: "is-main", sub: ricl.qs + "% delle uscite: imprese non cessate" },
+    { head: "Riclassificazioni verso ristoranti e ristorazione mobile", v: dest[0].share, f: function (v) { return fmt(v, 1) + "%"; }, cls: "is-main", sub: "ATECO 56.1, sul totale delle " + f0(ricl.value) + " riclassificazioni" }
+  ];
+  var tileSel = d3.select("#tiles").selectAll("div").data(tiles).join("div").attr("class", "r-tile");
+  tileSel.append("div").attr("class", "r-tile__head").text(function (d) { return d.head; });
+  tileSel.append("div").attr("class", function (d) { return "r-tile__num " + d.cls; }).text(function (d) { return d.f(d.v); });
+  tileSel.append("div").attr("class", "r-tile__label").text(function (d) { return d.sub; });
+  if (!R.reduced) tileSel.select(".r-tile__num").text(function (d) { return d.f(0); });
+  R.onFirstView(document.getElementById("tiles"), function () {
+    tileSel.select(".r-tile__num").each(function (d) { R.countUp(d3.select(this), d.v, d.f, "play"); });
+  });
+
+  // ---------- Interruttore ----------
+  var btn = d3.select("#toggle");
+  function setExpanded(v) {
+    if (v === expanded) return;
+    expanded = v;
+    btn.attr("aria-expanded", expanded);
+    d3.select("#toggle-txt").text(expanded ? "Nascondi le destinazioni" : "Mostra le destinazioni dei cambi di ATECO");
+    drawFn(lastW, "toggle"); R.scheduleHeight();
+  }
+  btn.on("click", function () { setExpanded(!expanded); });
+
+  // ---------- Grafico ----------
+  var host = document.getElementById("chart");
+  var tip = R.tooltip(host);
+  R.dismissOutside(host, function () { tip.hide(); hovered = null; highlight(); });
+
+  function tipFor(id) {
+    if (id === "tot") return R.tipHTML({ title: root.name, value: f0(root.value), unit: "imprese, 2019-2022",
+      rows: [[cess.name, f0(cess.value) + " (" + cess.qs + "%)"], [ricl.name, f0(ricl.value) + " (" + ricl.qs + "%)"]] });
+    if (id === "cess") return R.tipHTML({ title: cess.name, value: f0(cess.value), unit: "imprese",
+      rows: [["Quota sulle " + f0(cess.base) + " uscite", cess.qs + "%"]], note: "Imprese che hanno chiuso l'attività" });
+    if (id === "ricl") return R.tipHTML({ title: ricl.name, value: f0(ricl.value), unit: "imprese",
+      rows: [["Quota sulle " + f0(ricl.base) + " uscite", ricl.qs + "%"]],
+      note: "Riclassificazione amministrativa, non chiusura. " + (expanded ? "Clic per nascondere le destinazioni" : "Clic per vedere le destinazioni") });
+    var d = dest.find(function (x) { return x.id === id; });
+    return R.tipHTML({ title: d.name, value: q(d.qs), unit: "delle riclassificazioni",
+      rows: [["Base", f0(d.base) + " cambi di ATECO"]], note: "La fonte non pubblica il numero esatto di imprese" });
+  }
+  // un nodo o un flusso in evidenza accende anche ciò che gli è collegato
+  function related(id) {
+    if (!id) return null;
+    var s = {}; s[id] = 1;
+    if (id === "tot") { s.cess = s.ricl = 1; }
+    if (id === "cess" || id === "ricl") s.tot = 1;
+    if (id === "ricl") dest.forEach(function (d) { s[d.id] = 1; });
+    if (/^d\d/.test(id)) { s.ricl = 1; s.tot = 1; }
+    return s;
+  }
+  function highlight() {
+    var s = related(hovered);
+    var svg = d3.select(host).select("svg");
+    svg.selectAll(".node, .lab g").classed("is-dimmed", function (d) { return s && !s[d.id]; });
+    svg.selectAll(".flow").classed("is-dimmed", function (l) { return s && !(s[l.t] && s[l.s] && (hovered === l.t || hovered === l.s || (/^d\d/.test(hovered) && l.t === "ricl"))); })
+      .classed("is-hot", function (l) { return s && (hovered === l.t || hovered === l.s); });
+  }
+
+  var lastW = 0, drawFn;
+  R.responsive(host, drawFn = function (W, phase) {
+    lastW = W;
+    var narrow = R.isNarrow(W);
+    var NW = narrow ? 8 : 10, G1 = narrow ? 52 : 48, G2 = narrow ? 36 : 34;
+    var m = { top: 42, right: narrow ? 0 : 230, bottom: 8, left: 0 };
+    var w = W - m.left - m.right;
+    var FLOW = narrow ? 240 : 300;
+    var k = FLOW / root.value;                  // pixel per impresa
+    var x0 = 0, x1 = Math.round(w * (narrow ? 0.5 : 0.47)), x2 = w - NW;
+
+    // nodi: x, y, altezza
+    var N = {};
+    N.tot = { id: "tot", x: x0, y: 0, h: root.value * k, col: root.col };
+    N.cess = { id: "cess", x: x1, y: 0, h: cess.value * k, col: cess.col };
+    N.ricl = { id: "ricl", x: x1, y: cess.value * k + G1, h: ricl.value * k, col: ricl.col };
+    var yy = N.ricl.y;
+    dest.forEach(function (d) {
+      var h = N.ricl.h * d.share / shareSum;   // proporzionale alla quota
+      N[d.id] = { id: d.id, x: x2, y: yy, h: h, hv: Math.max(2, h), col: d.col, d: d };
+      yy += h + G2;
+    });
+    var chartBottom = Math.max(N.ricl.y + N.ricl.h, yy - G2 + 2);
+    var H = m.top + chartBottom + m.bottom;
+
+    // flussi: escono dal nodo di partenza impilati dall'alto
+    var links = [
+      { s: "tot", t: "cess", w: cess.value * k, sy: N.tot.y, ty: N.cess.y, col: cess.col },
+      { s: "tot", t: "ricl", w: ricl.value * k, sy: N.tot.y + cess.value * k, ty: N.ricl.y, col: ricl.col }
+    ];
+    var sy = N.ricl.y;
+    dest.forEach(function (d) {
+      var n = N[d.id];
+      links.push({ s: "ricl", t: d.id, w: n.h, sy: sy, ty: n.y, col: d.col, lv2: true });
+      sy += n.h;
+    });
+    var linkGen = d3.linkHorizontal();
+    function linkD(l) {
+      var a = N[l.s], b = N[l.t];
+      return linkGen({ source: [a.x + NW, l.sy + l.w / 2], target: [b.x, l.ty + l.w / 2] });
+    }
+
+    var DUR = R.reduced ? 0 : (phase === "toggle" ? 550 : R.DUR);
+    d3.select(host).select("svg").remove();
+    var svg = d3.select(host).insert("svg", ".r-tip").attr("width", W).attr("height", H).attr("role", "img")
+      .attr("aria-label", "Diagramma di Sankey. Delle " + f0(root.value) + " imprese uscite dalla categoria dei bar fra il 2019 e il 2022, " +
+        f0(cess.value) + " (" + cess.qs + "%) hanno cessato l'attività e " + f0(ricl.value) + " (" + ricl.qs + "%) hanno cambiato codice ATECO. " +
+        "Di queste ultime il " + q(dest[0].qs) + " è passato a ristoranti e ristorazione mobile, l'" + q(dest[1].qs) + " a mense e catering e il " + q(dest[2].qs) + " ad attività ricreative e di intrattenimento.");
+    svg.append("title").text("Destinazione delle imprese uscite dalla categoria dei bar, 2019-2022");
+    var g = svg.append("g").attr("transform", "translate(" + m.left + "," + m.top + ")");
+
+    var showLinks = links.filter(function (l) { return !l.lv2 || expanded; });
+    var showNodes = ["tot", "cess", "ricl"].concat(expanded ? dest.map(function (d) { return d.id; }) : []).map(function (id) { return N[id]; });
+
+    // flussi
+    var fl = g.append("g").selectAll("path").data(showLinks).join("path")
+      .attr("class", function (l) { return "flow mark" + (l.t === "ricl" || l.lv2 ? " clickable" : ""); })
+      .attr("d", linkD).style("stroke", function (l) { return l.col; })
+      .style("stroke-width", function (l) { return Math.max(1.5, l.w); });
+
+    // nodi
+    var nd = g.append("g").selectAll("rect").data(showNodes).join("rect")
+      .attr("class", function (n) { return "node mark" + (n.id === "ricl" ? " clickable" : ""); })
+      .attr("x", function (n) { return n.x; }).attr("width", NW)
+      .attr("y", function (n) { return n.y; }).attr("height", function (n) { return n.hv || n.h; })
+      .style("fill", function (n) { return n.col; });
+
+    // etichette
+    var lab = g.append("g").attr("class", "lab");
+    function label(id, x, y, anchor, name, val, valBold) {
+      var gg = lab.append("g").datum({ id: id }).attr("class", "mark");
+      var t = gg.append("text").attr("x", x).attr("y", y).attr("text-anchor", anchor);
+      t.append("tspan").attr("class", "n").attr("x", x).text(name);
+      var tv = t.append("tspan").attr("class", "v").attr("x", x).attr("dy", "1.3em");
+      tv.append("tspan").style("font-weight", 700).style("fill", valBold.col).text(valBold.txt);
+      if (val) tv.append("tspan").text(val);
+      return gg;
+    }
+    var totName = narrow ? "Uscite dai bar" : "Uscite dalla categoria dei bar";
+    label("tot", 0, -26, "start", totName, " imprese, 2019-2022", { txt: f0(root.value), col: "var(--ink)" });
+    // nomi dei rami a sinistra del nodo, sopra il flusso che arriva
+    var lx = x1 - 8;
+    label("cess", lx, N.cess.y + N.cess.h / 2 - 6, "end", narrow ? "Cessazioni" : "Cessazioni effettive", " · " + cess.qs + "%", { txt: f0(cess.value), col: "var(--red)" });
+    label("ricl", lx, N.ricl.y + N.ricl.h / 2 - 6, "end", narrow ? "Cambio di ATECO" : "Cambio di codice ATECO", " · " + ricl.qs + "%", { txt: f0(ricl.value), col: "var(--blue)" });
+    var destLabs = [];
+    if (expanded && !narrow) {
+      var hd = lab.append("g").datum({ id: "ricl" }).attr("class", "mark");
+      hd.append("text").attr("class", "v").attr("x", w + 10).attr("y", N[dest[0].id].y + N[dest[0].id].hv / 2 - 26).text("Quote sulle " + f0(ricl.value) + " riclassificazioni");
+      destLabs.push(hd);
+    }
+    if (!expanded) {
+      var hx = x1 + NW + 14, hint = lab.append("g").datum({ id: "ricl" }).attr("class", "mark clickable")
+        .on("click", function () { setExpanded(true); });
+      var ht = hint.append("text").attr("class", "v").attr("x", hx).attr("y", N.ricl.y + N.ricl.h / 2 - 4)
+        .text((narrow ? "▸ Tocca" : "▸ Clicca") + " il ramo blu per vedere dove sono andate le imprese riclassificate");
+      R.wrap(ht, (narrow ? w : w + m.right) - hx - 4);
+    }
+    if (expanded) {
+      dest.forEach(function (d) {
+        var n = N[d.id];
+        var sub = (dCode(d) ? " · ATECO " + dCode(d) : "");
+        var gl = narrow
+          ? label(d.id, w, n.y - 22, "end", dName(d), sub, { txt: q(d.qs), col: "var(--ink)" })
+          : label(d.id, w + 10, n.y + n.hv / 2 - 6, "start", dName(d), sub, { txt: q(d.qs), col: "var(--ink)" });
+        destLabs.push(gl);
+      });
+    }
+
+    // aree sensibili su nodi e flussi
+    function over(e, id) {
+      hovered = id; highlight();
+      var p = d3.pointer(e, host);
+      tip.show(tipFor(id), p[0], p[1]);
+    }
+    function out(e) { if (e.pointerType === "mouse") { tip.hide(); hovered = null; highlight(); } }
+    fl.on("pointerenter pointermove pointerdown", function (e, l) { over(e, l.t); }).on("pointerleave", out)
+      .on("click", function (e, l) { if (l.t === "ricl" || l.lv2) setExpanded(!expanded); });
+    nd.on("pointerenter pointermove pointerdown", function (e, n) { over(e, n.id); }).on("pointerleave", out)
+      .on("click", function (e, n) { if (n.id === "ricl") setExpanded(!expanded); });
+    g.append("g").selectAll("rect").data(showNodes).join("rect").attr("class", "hit")
+      .attr("x", function (n) { return n.x - 6; }).attr("width", NW + 12)
+      .attr("y", function (n) { return n.y - 4; }).attr("height", function (n) { return Math.max(14, (n.hv || n.h) + 8); })
+      .classed("clickable", function (n) { return n.id === "ricl"; })
+      .on("pointerenter pointermove pointerdown", function (e, n) { over(e, n.id); }).on("pointerleave", out)
+      .on("click", function (e, n) { if (n.id === "ricl") setExpanded(!expanded); });
+
+    // ---------- animazioni discrete ----------
+    function drawIn(sel, delay) {
+      sel.each(function () {
+        var L = this.getTotalLength();
+        d3.select(this).style("stroke-dasharray", L + " " + L).style("stroke-dashoffset", L)
+          .transition().delay(delay || 0).duration(DUR).ease(R.EASE).style("stroke-dashoffset", 0)
+          .on("end", function () { d3.select(this).style("stroke-dasharray", null).style("stroke-dashoffset", null); });
+      });
+    }
+    function fadeIn(sel, delay) { sel.style("opacity", 0).transition().delay(delay || 0).duration(250).style("opacity", null); }
+    if (DUR && phase === "pre") {
+      fl.style("opacity", 0); nd.style("opacity", 0); lab.style("opacity", 0);
+    } else if (DUR && phase === "play") {
+      fadeIn(nd.filter(function (n) { return n.id === "tot"; }));
+      drawIn(fl, 100);
+      fadeIn(nd.filter(function (n) { return n.id !== "tot"; }), DUR * 0.6);
+      fadeIn(lab, DUR * 0.6);
+    } else if (DUR && phase === "toggle" && expanded) {
+      var lv2 = fl.filter(function (l) { return l.lv2; });
+      drawIn(lv2, 0);
+      fadeIn(nd.filter(function (n) { return /^d\d/.test(n.id); }), DUR * 0.6);
+      destLabs.forEach(function (gl) { fadeIn(gl, DUR * 0.6); });
+    }
+    tip.hide();
+    highlight();
+  });
+}).catch(function (err) { Radar.fail(document.getElementById("chart"), err); });
+</script>
+</body>
+</html>
