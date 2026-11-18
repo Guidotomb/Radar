@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="it"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Dataviz Radar – QN</title>
+<style>
+body{font-family:"Libre Franklin","Helvetica Neue",Arial,sans-serif;background:#f7f8f9;color:#1a1a1a;margin:0;padding:24px}
+h1{font-family:Georgia,serif;margin:0 0 24px} h2{font-size:18px;margin:0 0 4px}
+.item{border-top:1px solid #e3e3e3;padding:20px 0 32px} .meta,.lab{font-size:13px;color:#6b6b6b}
+.prev{display:flex;gap:24px;flex-wrap:wrap;align-items:flex-start} .prev iframe{border:1px solid #e3e3e3;background:#f7f8f9}
+textarea{width:100%;max-width:1150px;font:12px/1.4 ui-monospace,monospace} button{font:inherit;margin-left:8px;cursor:pointer}
+</style></head><body>
+<h1>Dataviz Radar – QN</h1>
+<section class="item">
+  <h2>Meno bar, più ristoranti: come cambia l&#x27;Italia</h2>
+  <p class="meta"><a href="bar-ristoranti/">bar-ristoranti/</a> · Fonte: FIPE–Centro Studi Tagliacarne, giugno 2026</p>
+  <div class="prev">
+    <div><p class="lab">Desktop</p><iframe src="bar-ristoranti/" style="width:760px;height:840px" title="Meno bar, più ristoranti: come cambia l&#x27;Italia – desktop"></iframe></div>
+    <div><p class="lab">Mobile (360 px)</p><iframe src="bar-ristoranti/" style="width:360px;height:1200px" title="Meno bar, più ristoranti: come cambia l&#x27;Italia – mobile"></iframe></div>
+  </div>
+  <p class="lab">Snippet per il CMS <button type="button" class="copy">Copia</button></p>
+  <textarea readonly rows="6">&lt;iframe src=&quot;https://guidotomb.github.io/radar/bar-ristoranti/&quot; width=&quot;100%&quot; height=&quot;840&quot; frameborder=&quot;0&quot; scrolling=&quot;no&quot; title=&quot;Meno bar, più ristoranti: come cambia l&#x27;Italia&quot;&gt;&lt;/iframe&gt;
+&lt;script&gt;
+(function(){if(window.__radarQNv2)return;window.__radarQNv2=1;var O=&quot;https://guidotomb.github.io&quot;;var MQ=window.matchMedia(&quot;(prefers-color-scheme:dark)&quot;);function frames(){return Array.prototype.filter.call(document.getElementsByTagName(&quot;iframe&quot;),function(f){return(f.getAttribute(&quot;src&quot;)||&quot;&quot;).indexOf(O+&quot;/&quot;)===0;});}function theme(){var t=document.documentElement.getAttribute(&quot;data-theme&quot;);return t===&quot;dark&quot;||t===&quot;light&quot;?t:(MQ.matches?&quot;dark&quot;:&quot;light&quot;);}function bgOf(el){for(;el&amp;&amp;el.nodeType===1;el=el.parentElement){var c=getComputedStyle(el).backgroundColor;if(c&amp;&amp;c !==&quot;transparent&quot;&amp;&amp;!/rgba\([^)]*,\s*0\)$/.test(c))return c;}return null;}function send(f){try{f.contentWindow.postMessage({sentinel:&quot;radar-qn&quot;,type:&quot;theme&quot;,theme:theme(),bg:bgOf(f.parentElement)},O);}catch(e){}}function sendAll(){frames().forEach(send);}window.addEventListener(&quot;message&quot;,function(e){if(e.origin !==O)return;var d=e.data;if(!d||d.sentinel !==&quot;radar-qn&quot;||d.type !==&quot;height&quot;)return;frames().forEach(function(f){if(f.contentWindow !==e.source)return;var h=Math.ceil(+d.height);if(h &gt; 0&amp;&amp;20000 &gt; h)f.style.height=h+&quot;px&quot;;send(f);});});new MutationObserver(function(){sendAll();setTimeout(sendAll,400);}).observe(document.documentElement,{attributes:true,attributeFilter:[&quot;data-theme&quot;]});if(MQ.addEventListener)MQ.addEventListener(&quot;change&quot;,sendAll);})();
+&lt;/script&gt;</textarea>
+</section>
+<script>
+document.querySelectorAll(".copy").forEach(function(b){b.addEventListener("click",function(){
+var t=b.closest(".item").querySelector("textarea");t.select();
+(navigator.clipboard?navigator.clipboard.writeText(t.value):Promise.reject()).catch(function(){document.execCommand("copy");});
+b.textContent="Copiato";setTimeout(function(){b.textContent="Copia";},1500);});});
+</script>
+</body></html>

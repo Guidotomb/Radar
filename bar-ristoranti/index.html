@@ -1,0 +1,309 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Meno bar, più ristoranti: come cambia l'Italia – Radar QN</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Libre+Franklin:wght@400;500;600;700&family=Newsreader:opsz,wght@6..72,400;6..72,700&display=swap">
+<link rel="stylesheet" href="../assets/radar.css">
+<style>
+/* ---------- Controlli, riquadri (dataviz bar e ristoranti) ---------- */
+.r-controls { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 10px 16px; margin: 22px 0 0; }
+.r-seg { display: inline-flex; flex-wrap: wrap; gap: 4px; }
+.r-seg button {
+  font: 500 13px/1 var(--sans); color: var(--ink-2); background: transparent;
+  border: 1px solid var(--rule); border-radius: 2px; padding: 7px 10px; cursor: pointer;
+  transition: background 150ms ease, color 150ms ease, border-color 150ms ease;
+}
+.r-seg button:hover { color: var(--ink); border-color: var(--grey-4); }
+.r-seg button[aria-pressed="true"] { background: var(--ink); border-color: var(--ink); color: var(--bg); }
+.r-seg button:focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; }
+.row .row-name { transition: font-weight 0s; }
+.row.is-active .row-name { font-weight: 700; }
+.r-tiles {
+  display: grid; grid-template-columns: repeat(3, minmax(0, 1fr));
+  border: 1px solid var(--rule); border-radius: 2px; margin: 24px 0 0;
+}
+.r-tile { padding: 14px 16px 16px; border-left: 1px solid var(--rule); }
+.r-tile:first-child { border-left: 0; }
+.r-tile__num { font-size: 30px; line-height: 1.05; font-weight: 700; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
+.r-tile__num.is-hot { color: var(--red); }
+.r-tile__label { font-size: 13px; line-height: 1.35; color: var(--ink-2); margin-top: 4px; }
+@media (max-width: 519px) {
+  .r-tiles { grid-template-columns: 1fr; }
+  .r-tile { border-left: 0; border-top: 1px solid var(--rule); padding: 12px 14px 13px; }
+  .r-tile:first-child { border-top: 0; }
+  .r-tile__num { font-size: 26px; }
+}
+.row text, .year-labels text { paint-order: stroke; stroke: var(--bg); stroke-width: 4px; stroke-linejoin: round; }
+@media (max-width: 519px) {
+  .r-seg button { padding: 7px 7px; font-size: 12.5px; }
+  .r-controls { gap: 8px; }
+}
+.r-tile__head { font-size: 13px; line-height: 1.35; color: var(--ink-2); margin-bottom: 4px; }
+.r-tile__num.is-main { color: var(--blue); }
+.r-tile__label { font-size: 12px; }
+.cat-lab { paint-order: stroke; stroke: var(--bg); stroke-width: 4px; stroke-linejoin: round; }
+</style>
+<script src="https://cdn.jsdelivr.net/npm/d3@7"></script>
+<script src="../assets/radar.js"></script>
+</head>
+<body>
+<main class="radar">
+  <header>
+    <h1 class="r-title">Meno bar, più ristoranti: come cambia l'Italia</h1>
+    <p class="r-sub">Tra il 2015 e la prima metà del 2025 sono scomparsi dalle statistiche oltre 22mila bar. Nello stesso periodo sono cresciute le altre principali categorie della ristorazione.</p>
+  </header>
+
+  <div class="r-controls">
+    <div class="r-seg" role="group" aria-label="Categoria" id="ctl-cat"></div>
+    <div class="r-seg" role="group" aria-label="Misura" id="ctl-mode">
+      <button type="button" data-mode="abs" aria-pressed="true">Numeri assoluti</button>
+      <button type="button" data-mode="pct" aria-pressed="false">Variazione %</button>
+    </div>
+  </div>
+
+  <figure class="r-chart" id="chart" style="margin-top:14px"></figure>
+
+  <div class="r-tiles" id="tiles"></div>
+
+  <p class="r-note">Le linee uniscono soltanto i due estremi del periodo e non descrivono l'andamento degli anni intermedi. Il dato del 2025 si riferisce al primo semestre. Le variazioni sono saldi tra le due date: sommano aperture, cessazioni ed eventuali passaggi da una categoria all'altra, quindi non corrispondono al numero di locali chiusi.</p>
+
+  <footer class="r-foot">
+    <span>Fonte: FIPE–Centro Studi Tagliacarne, <i>Pubblici esercizi e movida</i>, giugno 2026, p. 7</span>
+    <span>Elaborazione Radar – QN</span>
+  </footer>
+</main>
+
+<script>
+Radar.loadCSV("../data/bar-ristoranti.csv").then(function (csv) {
+  var R = Radar, fmt = R.fmt;
+  var SHORT = { "Bar": "Bar", "Ristoranti con servizio": "Ristoranti", "Ristorazione da asporto": "Asporto", "Gelaterie e pasticcerie": "Gelaterie" };
+  function sgn(v, dec) { return (v > 0 ? "+" : "") + fmt(v, dec); }
+  function f0(v) { return fmt(v, 0); }
+  function p1(v) { return sgn(v, 1) + "%"; }
+
+  // ---------- Dati (dal CSV incorporato) ----------
+  var rows = csv.map(function (r, i) {
+    var a = R.num(r["2015"]), b = R.num(r["2025"]);
+    var d = { k: "c" + i, name: r["Categoria"], short: SHORT[r["Categoria"]] || r["Categoria"], v15: a, v25: b, diff: b - a, pct: (b / a - 1) * 100 };
+    if (d.diff !== R.num(r["Variazione assoluta"]) || Math.round(d.pct * 10) / 10 !== R.num(r["Variazione %"])) console.warn("Variazione non coerente nel CSV:", d.name);
+    d.pct = Math.round(d.pct * 10) / 10;
+    return d;
+  });
+  var bar = rows.find(function (d) { return d.name === "Bar"; });
+  var rist = rows.find(function (d) { return d.name === "Ristoranti con servizio"; });
+  // ruolo di colore: bar in rosso (il fenomeno), ristoranti in blu (il termine di paragone), il resto in grigio
+  rows.forEach(function (d) { d.role = d === bar ? "hot" : d === rist ? "main" : "ctx"; });
+  var COL = { hot: "var(--red)", main: "var(--blue)", ctx: "var(--grey-3)" };
+  var WID = { hot: 3, main: 2.5, ctx: 2 };
+
+  var mode = "abs", prevMode = "abs", selected = null, hovered = null;
+
+  // ---------- Controlli ----------
+  var ctlCat = d3.select("#ctl-cat");
+  ctlCat.selectAll("button").data([{ k: null, short: "Tutte" }].concat(rows)).join("button")
+    .attr("type", "button").text(function (d) { return d.short; })
+    .on("click", function (e, d) { select(d.k === selected ? null : d.k); });
+  function select(k) {
+    selected = k;
+    ctlCat.selectAll("button").attr("aria-pressed", function (d) { return d.k === selected; });
+    highlight();
+  }
+  select(null);
+  d3.selectAll("#ctl-mode button").on("click", function () {
+    var m = this.getAttribute("data-mode");
+    if (m === mode) return;
+    prevMode = mode; mode = m;
+    d3.selectAll("#ctl-mode button").attr("aria-pressed", function () { return this.getAttribute("data-mode") === mode; });
+    drawFn(lastW, "mode"); R.scheduleHeight();
+  });
+
+  // ---------- Riquadri ----------
+  var tiles = [
+    { head: "Bar in meno", v: -bar.diff, f: f0, cls: "is-hot", sub: "da " + f0(bar.v15) + " a " + f0(bar.v25) },
+    { head: "Ristoranti con servizio in più", v: rist.diff, f: function (v) { return sgn(v, 0); }, cls: "is-main", sub: "da " + f0(rist.v15) + " a " + f0(rist.v25) },
+    { head: "Bar in dieci anni", v: bar.pct, f: function (v) { return fmt(v, 1) + "%"; }, sub: "dal 2015 al primo semestre 2025" }
+  ];
+  var tileSel = d3.select("#tiles").selectAll("div").data(tiles).join("div").attr("class", "r-tile");
+  tileSel.append("div").attr("class", "r-tile__head").text(function (d) { return d.head; });
+  tileSel.append("div").attr("class", function (d) { return "r-tile__num " + (d.cls || ""); }).text(function (d) { return d.f(d.v); });
+  tileSel.append("div").attr("class", "r-tile__label").text(function (d) { return d.sub; });
+  if (!R.reduced) tileSel.select(".r-tile__num").text(function (d) { return d.f(0); });
+  R.onFirstView(document.getElementById("tiles"), function () {
+    tileSel.select(".r-tile__num").each(function (d) { R.countUp(d3.select(this), d.v, d.f, "play"); });
+  });
+
+  // ---------- Grafico ----------
+  var host = document.getElementById("chart");
+  var tip = R.tooltip(host);
+  R.dismissOutside(host, function () { tip.hide(); hovered = null; highlight(); });
+
+  function highlight() {
+    var k = hovered || selected;
+    d3.select(host).selectAll(".cat").classed("is-dimmed", function (d) { return k != null && d.k !== k; });
+    d3.select(host).selectAll(".anno").classed("is-dimmed", k != null && k !== bar.k && k !== rist.k);
+  }
+  function v0(d, m) { return m === "abs" ? d.v15 : 0; }
+  function v1(d, m) { return m === "abs" ? d.v25 : d.pct; }
+  function yScale(m, h) {
+    return m === "abs" ? d3.scaleLinear().domain([0, 130000]).range([h, 0])
+                       : d3.scaleLinear().domain([-21, 12]).range([h, 0]);
+  }
+  // allontana le etichette troppo vicine mantenendo l'ordine verticale
+  function dodge(items, gap, lo, hi) {
+    items.sort(function (a, b) { return a.y - b.y; });
+    for (var it = 0; it < 30; it++) {
+      var moved = false;
+      for (var i = 1; i < items.length; i++) {
+        var need = (items[i - 1].h + items[i].h) / 2 + gap, d = items[i].y - items[i - 1].y;
+        if (d < need) { var s = (need - d) / 2; items[i - 1].y -= s; items[i].y += s; moved = true; }
+      }
+      items.forEach(function (o) { o.y = Math.max(lo + o.h / 2, Math.min(hi - o.h / 2, o.y)); });
+      if (!moved) break;
+    }
+    return items;
+  }
+
+  var lastW = 0, drawFn;
+  R.responsive(host, drawFn = function (W, phase) {
+    lastW = W;
+    var narrow = R.isNarrow(W);
+    var m = { top: 34, right: narrow ? 104 : 200, bottom: 10, left: narrow ? 62 : 70 };
+    var H = narrow ? 380 : 400, w = W - m.left - m.right, h = H - m.top - m.bottom;
+    var y = yScale(mode, h), yPrev = yScale(phase === "mode" ? prevMode : mode, h);
+    var DUR = R.reduced ? 0 : (phase === "mode" ? 650 : 900);
+
+    d3.select(host).select("svg").remove();
+    var svg = d3.select(host).insert("svg", ".r-tip").attr("width", W).attr("height", H).attr("role", "img")
+      .attr("aria-label", "Esercizi della ristorazione in Italia nel 2015 e nel primo semestre 2025. " + rows.map(function (d) {
+        return d.name + " da " + f0(d.v15) + " a " + f0(d.v25) + " (" + sgn(d.diff, 0) + ", " + p1(d.pct) + ")";
+      }).join("; ") + ". Nel 2025 i ristoranti con servizio superano i bar.");
+    svg.append("title").text("Bar e ristorazione in Italia: 2015 e primo semestre 2025");
+    var g = svg.append("g").attr("transform", "translate(" + m.left + "," + m.top + ")");
+
+    // assi verticali dei due anni
+    [[0, "2015"], [w, narrow ? "I sem. 2025" : "I semestre 2025"]].forEach(function (a, i) {
+      g.append("line").attr("class", "grid").attr("x1", a[0]).attr("x2", a[0]).attr("y1", -6).attr("y2", h)
+        .style("stroke", "var(--grey-5)").style("stroke-width", 1);
+      g.append("text").attr("class", "series-label").attr("x", a[0]).attr("y", -16)
+        .attr("text-anchor", i ? "end" : "start").text(a[1]);
+    });
+    if (mode === "pct") {
+      g.append("line").attr("x1", 0).attr("x2", w).attr("y1", Math.round(y(0)) + 0.5).attr("y2", Math.round(y(0)) + 0.5)
+        .style("stroke", "var(--rule)").style("stroke-dasharray", "3 3");
+    }
+
+    // annotazione (solo numeri assoluti): il sorpasso, scritta a fine periodo e non sul punto d'incrocio,
+    // perché non sappiamo in che anno sia avvenuto
+    var anno = g.append("g").attr("class", "anno mark");
+    if (mode === "abs") {
+      var gap15 = bar.v15 - rist.v15, gap25 = rist.v25 - bar.v25;
+      var at = anno.append("text").attr("x", w - 8).attr("y", y(88000)).attr("text-anchor", "end")
+        .text("Nel 2015 i bar erano " + f0(gap15) + " in più dei ristoranti con servizio. Nel primo semestre 2025 sono " + f0(gap25) + " in meno");
+      R.wrap(at, narrow ? Math.min(w - 8, 150) : 210);
+      at.selectAll("tspan").attr("x", w - 8);
+    }
+
+    // categorie
+    var cats = g.selectAll("g.cat").data(rows, function (d) { return d.k; }).join("g").attr("class", "cat mark");
+    var ln = cats.append("line").attr("x1", 0)
+      .style("stroke", function (d) { return COL[d.role]; }).style("stroke-width", function (d) { return WID[d.role]; })
+      .style("stroke-linecap", "round");
+    var d15 = cats.append("circle").attr("cx", 0).attr("r", 4.5)
+      .style("fill", "var(--bg)").style("stroke", function (d) { return COL[d.role]; }).style("stroke-width", 2);
+    var d25 = cats.append("circle").attr("r", function (d) { return d.role === "hot" ? 6 : 5; })
+      .style("fill", function (d) { return COL[d.role]; });
+
+    // etichette: a sinistra il valore 2015, a destra valore 2025 + nome
+    var LH = narrow ? 28 : 16;
+    var leftItems = mode === "abs"
+      ? rows.map(function (d) { return { d: d, y: y(d.v15), h: 14 }; })
+      : [{ d: null, y: y(0), h: 14 }];
+    dodge(leftItems, 2, -4, h + 6);
+    var leftL = g.append("g").attr("class", "lab-left").selectAll("text").data(leftItems).join("text")
+      .attr("class", function (o) { return "val-label " + (o.d ? "cat-lab" : ""); }).attr("x", -10).attr("y", function (o) { return o.y; })
+      .attr("dy", "0.35em").attr("text-anchor", "end")
+      .style("fill", function (o) { return o.d && o.d.role !== "ctx" ? COL[o.d.role] : null; })
+      .text(function (o) { return o.d ? f0(o.d.v15) : "0%"; });
+
+    var rightItems = rows.map(function (d) { return { d: d, y: y(v1(d, mode)), h: LH }; });
+    dodge(rightItems, narrow ? 4 : 3, -4, h + 8);
+    var rightL = g.append("g").selectAll("text").data(rightItems).join("text").attr("class", "cat-lab")
+      .attr("x", w + 10).attr("y", function (o) { return o.y; });
+    rightL.each(function (o) {
+      var t = d3.select(this), c = o.d.role !== "ctx" ? COL[o.d.role] : "var(--ink)";
+      var valTxt = mode === "abs" ? f0(o.d.v25) : p1(o.d.pct);
+      if (narrow) {
+        t.append("tspan").attr("class", "val-label r-val").attr("x", w + 10).attr("dy", "-0.15em").style("fill", c).text(valTxt);
+        t.append("tspan").attr("class", "series-label--sub").attr("x", w + 10).attr("dy", "1.2em").text(o.d.short);
+      } else {
+        t.append("tspan").attr("class", "val-label r-val").attr("dy", "0.35em").style("fill", c).text(valTxt);
+        t.append("tspan").attr("class", "series-label--sub").attr("dx", 6).style("fill", o.d.role !== "ctx" ? "var(--ink)" : null)
+          .style("font-weight", o.d.role !== "ctx" ? 600 : null).text(o.d.name);
+      }
+    });
+    // le etichette di destra seguono il gruppo della loro categoria per l'evidenziazione
+    rightL.each(function (o) { this.__data__ = Object.assign({}, o, { k: o.d.k }); });
+    leftL.filter(function (o) { return o.d; }).each(function (o) { this.__data__ = Object.assign({}, o, { k: o.d.k }); });
+    g.selectAll("text.cat-lab").classed("mark cat", true);
+
+    // aree sensibili: una fascia larga lungo ogni linea
+    var hits = g.append("g").selectAll("line").data(rows).join("line").attr("class", "hit")
+      .attr("x1", 0).attr("x2", w).attr("y1", function (d) { return y(v0(d, mode)); }).attr("y2", function (d) { return y(v1(d, mode)); })
+      .style("stroke", "transparent").style("stroke-width", narrow ? 22 : 18).style("cursor", "pointer")
+      .on("pointerenter pointermove pointerdown", function (e, d) {
+        hovered = d.k; highlight();
+        var p = d3.pointer(e, host);
+        tip.show(R.tipHTML({
+          title: d.name,
+          value: mode === "abs" ? sgn(d.diff, 0) : p1(d.pct), unit: mode === "abs" ? "esercizi" : "",
+          rows: [["2015", f0(d.v15)], ["2025, I semestre", f0(d.v25)], ["Variazione", sgn(d.diff, 0)], ["Variazione %", p1(d.pct)]],
+          note: d === bar ? "Saldo tra le due date, non numero di chiusure" : null
+        }), p[0], p[1]);
+      })
+      .on("pointerleave", function (e) { if (e.pointerType === "mouse") { tip.hide(); hovered = null; highlight(); } })
+      .on("click", function (e, d) { select(d.k === selected ? null : d.k); });
+
+    // ---------- stato e animazioni ----------
+    function setAt(t, sc) {   // t: il punto 2025 avanza dal valore 2015 a quello 2025
+      ln.attr("x2", w * (t === 0 ? 0.0001 : 1))
+        .attr("y1", function (d) { return sc(v0(d, mode)); })
+        .attr("y2", function (d) { var a = sc(v0(d, mode)); return a + (sc(v1(d, mode)) - a) * t; });
+      d15.attr("cy", function (d) { return sc(v0(d, mode)); });
+      d25.attr("cx", w).attr("cy", function (d) { var a = sc(v0(d, mode)); return a + (sc(v1(d, mode)) - a) * t; });
+      rightL.selectAll(".r-val").text(function () {
+        var o = d3.select(this.parentNode).datum(), d = o.d, v = v0(d, mode) + (v1(d, mode) - v0(d, mode)) * t;
+        return mode === "abs" ? f0(v) : p1(v);
+      });
+    }
+    if (phase === "static" || DUR === 0) setAt(1, y);
+    else if (phase === "pre") { setAt(0, y); anno.style("opacity", 0); }
+    else if (phase === "play") {
+      setAt(0, y); anno.style("opacity", 0);
+      svg.transition().duration(DUR).ease(R.EASE).tween("slope", function () { return function (t) { setAt(t, y); }; })
+        .on("end", function () { anno.transition().duration(300).style("opacity", null); });
+    } else {
+      // cambio di misura: le linee scivolano dalla vecchia scala alla nuova
+      var pm = prevMode;
+      setAt(1, y);
+      ln.attr("y1", function (d) { return yPrev(v0(d, pm)); }).attr("y2", function (d) { return yPrev(v1(d, pm)); });
+      d15.attr("cy", function (d) { return yPrev(v0(d, pm)); });
+      d25.attr("cy", function (d) { return yPrev(v1(d, pm)); });
+      var tr = function (s) { return s.transition().duration(DUR).ease(d3.easeCubicInOut); };
+      tr(ln).attr("y1", function (d) { return y(v0(d, mode)); }).attr("y2", function (d) { return y(v1(d, mode)); });
+      tr(d15).attr("cy", function (d) { return y(v0(d, mode)); });
+      tr(d25).attr("cy", function (d) { return y(v1(d, mode)); });
+      g.selectAll(".lab-left text, text.cat-lab, .anno").style("opacity", 0)
+        .transition().delay(DUR * 0.6).duration(250).style("opacity", null);
+    }
+    tip.hide();
+    highlight();
+  });
+}).catch(function (err) { Radar.fail(document.getElementById("chart"), err); });
+</script>
+
+</body>
+</html>
