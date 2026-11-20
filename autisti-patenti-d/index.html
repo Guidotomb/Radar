@@ -25,7 +25,6 @@
   </div>
 
   <figure class="r-chart" id="chart" style="margin-top:20px"></figure>
-  <div class="r-key"><span><i class="sw sw--ring-b"></i>Dato incoerente nella fonte, da verificare</span></div>
   <p class="r-note">Il dato conta gli esami superati, non le persone né i nuovi autisti effettivamente assunti. Le fonti cambiano nel tempo: ministero dei Trasporti (rapporto 2011) fino al 2003, Agens per il 2004 e il 2005, ministero dei Trasporti (rapporto 2025) dal 2006.</p>
 
   <footer class="r-foot">
@@ -45,7 +44,7 @@
       return { year: +r.anno, v: R.num(r.promossi), ko: R.num(r.respinti), tot: R.num(r.totale), src: r.fonte, note: r.nota || "" };
     }).filter(function (d) { return d.year && d.v != null; })
       .sort(function (a, b) { return a.year - b.year; });
-    data.forEach(function (d) { d.flag = d.note !== ""; });
+    data.forEach(function (d) { d.incons = d.note !== ""; d.flag = false; });
 
     var first = data[0], last = data[data.length - 1];
     var byYear = {}; data.forEach(function (d) { byYear[d.year] = d; });
@@ -194,10 +193,10 @@
         cross.attr("x1", cx).attr("x2", cx).style("opacity", 1);
         pts.attr("r", function (p) { return p === d ? 5.5 : baseR(p); });
         var rowsT = [["Respinti", fmt(d.ko)], ["Esami sostenuti", fmt(d.tot)]];
-        if (!d.flag) rowsT.push(["Promossi", fmt(d.v / d.tot * 100, 1) + "%"]);
+        if (!d.incons) rowsT.push(["Promossi", fmt(d.v / d.tot * 100, 1) + "%"]);
         tip.show(R.tipHTML({
           title: String(d.year), value: fmt(d.v), unit: "esami superati", rows: rowsT,
-          note: d.flag ? "Nella fonte promossi e respinti non sommano al totale: dato da verificare" : null
+          note: null
         }), cx + m.left, cy + m.top);
       }
       clearActive = function () { cross.style("opacity", 0); pts.attr("r", baseR); };
