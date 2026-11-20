@@ -197,7 +197,7 @@
         if (!d.flag) rowsT.push(["Promossi", fmt(d.v / d.tot * 100, 1) + "%"]);
         tip.show(R.tipHTML({
           title: String(d.year), value: fmt(d.v), unit: "esami superati", rows: rowsT,
-          note: d.flag ? "Nella fonte promossi e respinti non sommano al totale: dato da verificare" : "Fonte: " + d.src
+          note: d.flag ? "Nella fonte promossi e respinti non sommano al totale: dato da verificare" : null
         }), cx + m.left, cy + m.top);
       }
       clearActive = function () { cross.style("opacity", 0); pts.attr("r", baseR); };

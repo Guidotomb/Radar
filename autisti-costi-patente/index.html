@@ -1,0 +1,225 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Diventare autista può costare più di tre stipendi – Radar QN</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Libre+Franklin:wght@400;500;600;700&family=Newsreader:opsz,wght@6..72,400;6..72,700&display=swap">
+<link rel="stylesheet" href="../assets/radar.css">
+<style>
+  .controls { display: flex; flex-wrap: wrap; gap: 12px 22px; margin: 22px 0 0; align-items: center; }
+  .ctl { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; color: var(--ink-2); }
+  .seg { display: inline-flex; border: 1px solid var(--rule); border-radius: 999px; padding: 2px; gap: 2px; }
+  .seg button { font: 500 13px var(--sans); color: var(--ink-2); background: transparent; border: 0; border-radius: 999px; padding: 6px 13px; cursor: pointer; }
+  .seg button.is-on { background: var(--ink); color: var(--bg); font-weight: 600; }
+  .answer { font-family: var(--serif); font-size: clamp(20px, 4.4vw, 25px); line-height: 1.28; color: var(--title); margin: 20px 0 0; }
+  .answer .k { font-weight: 700; }
+  .answer .r { color: var(--red); font-weight: 700; }
+  .items { display: flex; flex-wrap: wrap; gap: 4px 22px; margin: 14px 0 0; font-size: 13px; color: var(--ink-2); font-variant-numeric: tabular-nums; }
+  .items b { color: var(--ink); font-weight: 600; }
+  .grp-lab { font-size: 13px; font-weight: 700; fill: var(--ink); }
+  .grp-sub { font-size: 12px; fill: var(--ink-2); }
+  .bar-lab { font-size: 12.5px; fill: var(--ink-2); }
+  .sal-lab { font-size: 11px; fill: var(--ink-2); }
+  .sal-line { stroke: var(--grey-3); stroke-width: 0.75; stroke-dasharray: 2 3; }
+  .sal.is-on .sal-line { stroke: var(--ink); stroke-width: 1.25; stroke-dasharray: none; }
+  .sal.is-on .sal-lab { fill: var(--ink); font-weight: 700; }
+  .sal-hit { fill: transparent; cursor: pointer; }
+  .bar { cursor: pointer; }
+</style>
+<script src="https://cdn.jsdelivr.net/npm/d3@7"></script>
+<script src="../assets/radar.js"></script>
+</head>
+<body>
+<main class="radar">
+  <header>
+    <h1 class="r-title">Diventare autista può costare più di tre stipendi</h1>
+    <p class="r-sub">Patente D e Carta di qualificazione del conducente (Cqc), per chi ha già la patente B</p>
+  </header>
+
+  <div class="controls">
+    <span class="ctl">La tua età
+      <span class="seg" role="group" aria-label="Fascia d'età">
+        <button type="button" data-v="young">18-35 anni</button>
+        <button type="button" data-v="old">Più di 35 anni</button>
+      </span>
+    </span>
+  </div>
+
+  <p class="answer" id="answer" aria-live="polite"></p>
+  <div class="items" id="items"></div>
+  <figure class="r-chart" id="chart" style="margin-top:18px"></figure>
+  <p class="r-note">Stipendio: netto d'ingresso stimato dal contratto nazionale. Il bonus copre l'80% della spesa fino a 2.500 euro per chi ha 18-35 anni, ma i voucher sono esauriti.</p>
+
+  <footer class="r-foot">
+    <span>Fonte: Mit, Ccnl autoferrotranvieri, ACI, autoscuole</span>
+    <span>Elaborazione Radar – QN</span>
+  </footer>
+</main>
+
+<script>
+(function () {
+  var R = Radar, fmt = R.fmt;
+
+  R.loadCSV("../data/autisti-costi.csv").then(function (rows) {
+    var C = {};
+    rows.forEach(function (r) { C[r.voce + (r.percorso && r.percorso !== "tutti" ? "_" + r.percorso : "")] = { min: R.num(r.min), max: R.num(r.max) }; });
+    var Q = C.bonus_quota.min, BMAX = C.bonus_max.min, SAL = C.stipendio_netto.min, GROSS = C.stipendio_lordo.min;
+    var state = { group: "young" };
+    var COURSES = [
+      { key: "accelerato", name: "Corso accelerato", sub: "140 ore" },
+      { key: "ordinario", name: "Corso ordinario", sub: "280 ore" }
+    ];
+
+    function r50(n) { return Math.round(n / 50) * 50; }
+    function own(t) { return state.group === "young" ? t - Math.min(t * Q / 100, BMAX) : t; }
+    function course(c) {
+      var parts = [["Patente D", C.patente_d], ["Corso Cqc", C["cqc_" + c.key]], ["Esami e visita", C.esami_bolli_visita]];
+      var lo = d3.sum(parts, function (p) { return p[1].min; }), hi = d3.sum(parts, function (p) { return p[1].max; });
+      return { c: c, parts: parts, lo: lo, hi: hi, ownLo: own(lo), ownHi: own(hi) };
+    }
+    function salText(m) {
+      var W = { 1: "uno stipendio", 1.5: "uno stipendio e mezzo", 2: "due stipendi", 2.5: "due stipendi e mezzo", 3: "tre stipendi", 3.5: "tre stipendi e mezzo", 4: "quattro stipendi" };
+      var h = Math.floor(m * 2) / 2, d = m - h;
+      if (d < 0.1) return W[h];
+      if (d > 0.35) return "quasi " + W[h + 0.5];
+      return "più di " + W[h];
+    }
+
+    d3.select("#items").html(
+      "<span>Patente D <b>" + fmt(C.patente_d.min) + "-" + fmt(C.patente_d.max) + " €</b></span>" +
+      "<span>Corso Cqc <b>" + fmt(C.cqc_accelerato.min) + "-" + fmt(C.cqc_ordinario.max) + " €</b></span>" +
+      "<span>Esami e visita <b>" + fmt(C.esami_bolli_visita.min) + "-" + fmt(C.esami_bolli_visita.max) + " €</b></span>" +
+      "<span>Stipendio netto d'ingresso <b>circa " + fmt(SAL) + " €</b></span>");
+
+    var host = document.getElementById("chart");
+    var tip = R.tooltip(host);
+    var clearActive = function () {};
+    R.dismissOutside(host, function () { tip.hide(); clearActive(); });
+    var lastW = 0;
+
+    function draw(W, phase) {
+      lastW = W;
+      var narrow = R.isNarrow(W);
+      var young = state.group === "young";
+      var data = COURSES.map(course);
+      var labW = narrow ? 0 : 118, barH = narrow ? 20 : 22, rowH = narrow ? 44 : 34, headH = narrow ? 22 : 24, gap = 14, top = 24;
+      var perGroup = headH + (young ? 2 : 1) * rowH;
+      var H = top + data.length * perGroup + (data.length - 1) * gap + (narrow ? 6 : 0);
+      var maxTot = C.patente_d.max + C.cqc_ordinario.max + C.esami_bolli_visita.max;
+      var w = W - labW - (narrow ? 92 : 100);
+      var x = d3.scaleLinear().domain([0, maxTot]).range([0, w]);
+
+      d3.select(host).select("svg").remove();
+      var svg = d3.select(host).insert("svg", ".r-tip").attr("width", W).attr("height", H).attr("role", "img")
+        .attr("aria-label", data.map(function (d) {
+          return d.c.name + ": tra " + fmt(d.lo) + " e " + fmt(d.hi) + " euro" + (young ? ", con il bonus tra " + fmt(d.ownLo) + " e " + fmt(d.ownHi) : "");
+        }).join("; "));
+      svg.append("title").text("Quanto costa diventare autista di autobus");
+      var g = svg.append("g").attr("transform", "translate(" + labW + "," + top + ")");
+
+      // ---- gruppi e barre ----
+      var bars = [];
+      data.forEach(function (d, gi) {
+        var gy = gi * (perGroup + gap);
+        var head = g.append("text").attr("x", narrow ? 0 : -labW).attr("y", gy + 12);
+        head.append("tspan").attr("class", "grp-lab").text(d.c.name);
+        head.append("tspan").attr("class", "grp-sub").attr("dx", 6).text(d.c.sub);
+        var rowsD = [{ k: "cost", lab: young ? "Costo" : "A tuo carico", lo: d.lo, hi: d.hi, col: young ? "var(--grey-2)" : "var(--red)" }];
+        if (young) rowsD.push({ k: "own", lab: "Con il bonus", lo: d.ownLo, hi: d.ownHi, col: "var(--red)" });
+        rowsD.forEach(function (r, ri) {
+          var y = gy + headH + ri * rowH + (narrow ? 14 : 0);
+          var rg = g.append("g").attr("class", "bar mark").attr("transform", "translate(0," + y + ")").datum({ d: d, r: r });
+          rg.append("text").attr("class", "bar-lab").attr("x", narrow ? 0 : -12).attr("y", narrow ? -5 : barH / 2)
+            .attr("dy", narrow ? 0 : "0.35em").attr("text-anchor", narrow ? "start" : "end").text(r.lab);
+          var solid = rg.append("path").style("fill", r.col);
+          var range = rg.append("rect").attr("y", 0).attr("height", barH).attr("rx", 2).style("fill", r.col).style("opacity", 0.3);
+          var lab = rg.append("text").attr("class", "val-label").attr("y", barH / 2).attr("dy", "0.35em")
+            .style("fill", r.k === "own" || !young ? "var(--red)" : "var(--ink)");
+          rg.append("rect").attr("class", "hit").attr("x", 0).attr("y", -4).attr("width", w + 90).attr("height", barH + 8);
+          bars.push({ g: rg, solid: solid, range: range, lab: lab, r: r });
+        });
+      });
+      function setBars(k) {
+        bars.forEach(function (b) {
+          var lo = b.r.lo * k, hi = b.r.hi * k;
+          b.solid.attr("d", R.barPathH(0, 0, x(lo), barH, 0));
+          b.range.attr("x", x(lo) + 1).attr("width", Math.max(0, x(hi) - x(lo) - 1));
+          b.lab.attr("x", x(hi) + 6).text(k ? fmt(r50(b.r.lo)) + "-" + fmt(r50(b.r.hi)) + " €" : "");
+        });
+      }
+      if (phase === "pre") setBars(0);
+      else if (phase === "play" && !R.reduced) d3.select(host).transition().duration(R.DUR).ease(R.EASE).tween("b", function () { return setBars; });
+      else setBars(1);
+
+      // ---- linee degli stipendi, interattive ----
+      var ks = d3.range(1, Math.floor(maxTot / SAL) + 1);
+      var sal = g.insert("g", ":first-child").selectAll("g.sal").data(ks).join("g").attr("class", "sal")
+        .attr("transform", function (k) { return "translate(" + (Math.round(x(k * SAL)) + 0.5) + ",0)"; });
+      sal.append("line").attr("class", "sal-line").attr("y1", -8).attr("y2", H - top - 2);
+      sal.append("text").attr("class", "sal-lab").attr("text-anchor", "middle").attr("y", -12)
+        .text(function (k) { return k === 1 ? "1 stipendio" : k + " stipendi"; });
+      if (narrow) sal.select("text").text(function (k) { return k === 1 ? "1 stipendio" : k; });
+      var salHit = g.append("g").selectAll("rect").data(ks).join("rect").attr("class", "sal-hit")
+        .attr("x", function (k) { return x(k * SAL) - 9; }).attr("y", -top).attr("width", 18).attr("height", 22);
+      var salStrip = g.append("g").selectAll("rect").data(ks).join("rect").attr("class", "sal-hit sal-strip")
+        .attr("x", function (k) { return x(k * SAL) - 5; }).attr("y", -2).attr("width", 10).attr("height", H - top);
+
+      function showSal(ev, k) {
+        sal.classed("is-on", function (j) { return j === k; });
+        var q = d3.pointer(ev, host);
+        tip.show(R.tipHTML({
+          title: k === 1 ? "1 stipendio" : k + " stipendi",
+          value: fmt(k * SAL), unit: "euro netti",
+          note: "Netto mensile d'ingresso stimato: " + fmt(SAL) + " euro, dal minimo del contratto nazionale (" + fmt(GROSS, 0) + " euro lordi, parametro 140), senza indennità e straordinari."
+        }), q[0], q[1]);
+      }
+      function showBar(ev, b) {
+        var d = b.d, r = b.r, q = d3.pointer(ev, host);
+        sal.classed("is-on", false);
+        g.selectAll("g.bar").classed("is-dimmed", function (o) { return o !== b; });
+        var rowsT = r.k === "own"
+          ? [["Costo", fmt(r50(d.lo)) + "-" + fmt(r50(d.hi)) + " €"], ["Coperto dal bonus", fmt(r50(d.lo - d.ownLo)) + "-" + fmt(r50(d.hi - d.ownHi)) + " €"]]
+          : d.parts.map(function (p) { return [p[0], fmt(p[1].min) + "-" + fmt(p[1].max) + " €"]; });
+        tip.show(R.tipHTML({
+          title: d.c.name + " · " + d.c.sub,
+          value: fmt(r50(r.lo)) + "-" + fmt(r50(r.hi)), unit: "euro",
+          rows: rowsT,
+          note: "Pari a " + fmt(r.lo / SAL, 1) + "-" + fmt(r.hi / SAL, 1) + " stipendi netti" + (r.k === "own" ? ". Il bonus copre l'80% fino a " + fmt(BMAX) + " euro, ma i voucher sono esauriti." : "")
+        }), q[0], q[1]);
+      }
+      clearActive = function () { sal.classed("is-on", false); g.selectAll("g.bar").classed("is-dimmed", false); };
+      [salHit, salStrip].forEach(function (sel) {
+        sel.on("pointerenter pointermove pointerdown", showSal).on("pointerleave", function (ev) { if (ev.pointerType === "mouse") { tip.hide(); clearActive(); } });
+      });
+      sal.select("line").style("pointer-events", "none");
+      g.selectAll("g.bar").on("pointerenter pointermove pointerdown", function (ev, b) { showBar(ev, b); })
+        .on("pointerleave", function (ev) { if (ev.pointerType === "mouse") { tip.hide(); clearActive(); } });
+      R.scheduleHeight();
+    }
+
+    function update() {
+      var young = state.group === "young";
+      var data = COURSES.map(course);
+      var lo = d3.min(data, function (d) { return d.lo; }), hi = d3.max(data, function (d) { return d.hi; });
+      var oLo = d3.min(data, function (d) { return d.ownLo; }), oHi = d3.max(data, function (d) { return d.ownHi; });
+      d3.selectAll(".seg button").classed("is-on", function () { return this.getAttribute("data-v") === state.group; });
+      d3.select("#answer").html(young
+        ? "Tra i 18 e i 35 anni diventare autista costa tra <span class=\"k\">" + fmt(r50(lo)) + " e " + fmt(r50(hi)) + " euro</span>, fino a " + salText(hi / SAL) +
+          ". Con il bonus ne resterebbero da pagare tra <span class=\"r\">" + fmt(r50(oLo)) + " e " + fmt(r50(oHi)) + "</span>, ma i voucher sono esauriti."
+        : "Oltre i 35 anni il bonus non spetta: diventare autista costa tra <span class=\"r\">" + fmt(r50(lo)) + " e " + fmt(r50(hi)) + " euro</span>, fino a " +
+          salText(hi / SAL) + ", tutti a tuo carico.");
+    }
+
+    R.responsive(host, draw);
+    update();
+    d3.selectAll(".seg button").on("click", function () {
+      state.group = this.getAttribute("data-v"); tip.hide(); update(); draw(lastW, "static");
+    });
+  }).catch(function (e) { R.fail("#chart", e); });
+})();
+</script>
+</body>
+</html>
