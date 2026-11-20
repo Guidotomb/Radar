@@ -51,7 +51,7 @@
   <p class="answer" id="answer" aria-live="polite"></p>
   <div class="items" id="items"></div>
   <figure class="r-chart" id="chart" style="margin-top:18px"></figure>
-  <p class="r-note">Stipendio: netto d'ingresso stimato dal contratto nazionale. Il bonus copre l'80% della spesa fino a 2.500 euro per chi ha 18-35 anni, ma i voucher sono esauriti.</p>
+  <p class="r-note">Stipendio: netto d'ingresso stimato dal contratto nazionale. Il bonus copre l'80% della spesa fino a 2.500 euro per chi ha 18-35 anni, ma i fondi sono esauriti.</p>
 
   <footer class="r-foot">
     <span>Fonte: Mit, Ccnl autoferrotranvieri, ACI, autoscuole</span>
@@ -187,7 +187,7 @@
           title: d.c.name + " · " + d.c.sub,
           value: fmt(r50(r.lo)) + "-" + fmt(r50(r.hi)), unit: "euro",
           rows: rowsT,
-          note: "Pari a " + fmt(r.lo / SAL, 1) + "-" + fmt(r.hi / SAL, 1) + " stipendi netti" + (r.k === "own" ? ". Il bonus copre l'80% fino a " + fmt(BMAX) + " euro, ma i voucher sono esauriti." : "")
+          note: "Pari a " + fmt(r.lo / SAL, 1) + "-" + fmt(r.hi / SAL, 1) + " stipendi netti" + (r.k === "own" ? ". Il bonus copre l'80% fino a " + fmt(BMAX) + " euro, ma i fondi sono esauriti." : "")
         }), q[0], q[1]);
       }
       clearActive = function () { sal.classed("is-on", false); g.selectAll("g.bar").classed("is-dimmed", false); };
@@ -208,7 +208,7 @@
       d3.selectAll(".seg button").classed("is-on", function () { return this.getAttribute("data-v") === state.group; });
       d3.select("#answer").html(young
         ? "Tra i 18 e i 35 anni diventare autista costa tra <span class=\"k\">" + fmt(r50(lo)) + " e " + fmt(r50(hi)) + " euro</span>, fino a " + salText(hi / SAL) +
-          ". Con il bonus ne resterebbero da pagare tra <span class=\"r\">" + fmt(r50(oLo)) + " e " + fmt(r50(oHi)) + "</span>, ma i voucher sono esauriti."
+          ". Con il bonus ne resterebbero da pagare tra <span class=\"r\">" + fmt(r50(oLo)) + " e " + fmt(r50(oHi)) + "</span>, ma i fondi sono esauriti."
         : "Oltre i 35 anni il bonus non spetta: diventare autista costa tra <span class=\"r\">" + fmt(r50(lo)) + " e " + fmt(r50(hi)) + " euro</span>, fino a " +
           salText(hi / SAL) + ", tutti a tuo carico.");
     }
