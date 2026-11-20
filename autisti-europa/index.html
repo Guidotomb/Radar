@@ -1,0 +1,225 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Autisti di autobus mancanti in Europa – Radar QN</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Libre+Franklin:wght@400;500;600;700&family=Newsreader:opsz,wght@6..72,400;6..72,700&display=swap">
+<link rel="stylesheet" href="../assets/radar.css">
+<style>
+  :root { --land-out: #e9eaeb; }
+  :root[data-theme="dark"] { --land-out: #1f2123; }
+  :root[data-bg="notte"] { --land-out: #0f1b20; }
+  .land { stroke: var(--bg); stroke-width: 0.6; stroke-linejoin: round; }
+  .land.has { cursor: pointer; }
+  .map-lab { font-size: 12px; font-weight: 700; fill: var(--ink); paint-order: stroke; stroke: var(--bg); stroke-width: 3px; stroke-linejoin: round; pointer-events: none; }
+  .sw--hatch-b { background: repeating-linear-gradient(135deg, var(--blue-3) 0 2px, var(--blue-5) 2px 4px); }
+  .sw--it { background: var(--blue-3); box-shadow: inset 0 0 0 2px var(--red); }
+</style>
+<script src="https://cdn.jsdelivr.net/npm/d3@7"></script>
+<script src="../assets/radar.js"></script>
+</head>
+<body>
+<main class="radar">
+  <header>
+    <h1 class="r-title">Nei Paesi Bassi manca un autista su cinque</h1>
+    <p class="r-sub">Quota di posti di autista di autobus e pullman scoperti per Paese, stima 2023</p>
+  </header>
+
+  <div class="r-big" id="big" aria-hidden="true">
+    <span class="r-big__num" id="big-num">&nbsp;</span>
+    <span class="r-big__label" id="big-label"></span>
+  </div>
+
+  <figure class="r-chart" id="chart" style="margin-top:16px"></figure>
+  <div class="r-key" id="key"></div>
+  <p class="r-note">Le stime nazionali combinano gli occupati Eurostat 2021 con le quote dei sondaggi IRU e delle associazioni di categoria. In grigio i Paesi compresi nel totale europeo ma senza una stima nazionale; più chiari quelli fuori dall'indagine.</p>
+
+  <footer class="r-foot">
+    <span>Fonte: IRU, Driver Shortage Report 2023; confini © EuroGeographics</span>
+    <span>Elaborazione Radar – QN</span>
+  </footer>
+</main>
+
+<script>
+(function () {
+  var R = Radar, fmt = R.fmt;
+
+  // perimetro IRU: Ue-27, Regno Unito, Norvegia, Svizzera (nomi in italiano per i tooltip)
+  var PERIM = { AT: "Austria", BE: "Belgio", BG: "Bulgaria", CY: "Cipro", CZ: "Repubblica Ceca", DE: "Germania", DK: "Danimarca",
+    EE: "Estonia", ES: "Spagna", FI: "Finlandia", FR: "Francia", GR: "Grecia", HR: "Croazia", HU: "Ungheria", IE: "Irlanda",
+    IT: "Italia", LT: "Lituania", LU: "Lussemburgo", LV: "Lettonia", MT: "Malta", NL: "Paesi Bassi", PL: "Polonia",
+    PT: "Portogallo", RO: "Romania", SE: "Svezia", SI: "Slovenia", SK: "Slovacchia", GB: "Regno Unito", NO: "Norvegia", CH: "Svizzera" };
+  var CLASSES = [
+    { min: 0, max: 8, col: "var(--blue-5)", label: "Meno dell'8%" },
+    { min: 8, max: 11, col: "var(--blue-4)", label: "8-10%" },
+    { min: 11, max: 14, col: "var(--blue-3)", label: "11-13%" },
+    { min: 14, max: 17, col: "var(--blue-2)", label: "14-16%" },
+    { min: 17, max: 101, col: "var(--blue-1)", label: "17% e oltre" }
+  ];
+  function cls(v) { return CLASSES.find(function (c) { return v >= c.min && v < c.max; }); }
+
+  Promise.all([
+    R.loadCSV("../data/autisti-europa.csv"),
+    fetch("../data/autisti-europa-confini.geojson", { cache: "no-cache" }).then(function (r) { if (!r.ok) throw new Error("Confini non trovati"); return r.json(); })
+  ]).then(function (res) {
+    var rows = res[0], geo = res[1];
+    var byIso = {}, total = null;
+    rows.forEach(function (r) {
+      var d = { name: r.paese, iso: r.iso2, qmin: R.num(r.quota_min), qmax: R.num(r.quota_max),
+        pmin: R.num(r.posti_min), pmax: R.num(r.posti_max), note: r.nota };
+      d.range = d.qmin !== d.qmax;
+      if (d.iso === "TOT") total = d; else byIso[d.iso] = d;
+    });
+    var ranked = Object.keys(byIso).map(function (k) { return byIso[k]; })
+      .sort(function (a, b) { return (b.qmin + b.qmax) - (a.qmin + a.qmax) || b.pmax - a.pmax; });
+    var top = ranked[0], it = byIso.IT;
+
+    // big number
+    var bigNum = d3.select("#big-num");
+    d3.select("#big-label").text("posti di autista scoperti in Europa, il " + fmt(total.qmax) + "% del totale (Ue-27, Regno Unito, Norvegia e Svizzera)");
+    var bigFmt = function (v) { return fmt(Math.round(v / 1000) * 1000); };
+    if (R.reduced) bigNum.text(bigFmt(total.pmax));
+    else { bigNum.text(bigFmt(0)); R.onFirstView(document.getElementById("big"), function () { R.countUp(bigNum, total.pmax, bigFmt, "play"); }); }
+
+    // chiave
+    var key = d3.select("#key");
+    CLASSES.forEach(function (c) { key.append("span").html('<i class="sw" style="background:' + c.col + '"></i>' + c.label); });
+    key.append("span").html('<i class="sw sw--hatch-b"></i>Intervallo');
+    key.append("span").html('<i class="sw" style="background:var(--grey-5)"></i>Senza stima');
+
+    // area da inquadrare: il perimetro IRU senza Cipro (troppo a est)
+    var frame = { type: "FeatureCollection", features: geo.features.filter(function (f) { return PERIM[f.id] && f.id !== "CY"; }) };
+    // centro di ciascun Paese con dato: il centroide del poligono più grande (niente isole)
+    function mainCentroid(f) {
+      var best = null, amax = -1;
+      f.geometry.coordinates.forEach(function (p) {
+        var g = { type: "Polygon", coordinates: p }, a = d3.geoArea(g);
+        if (a > amax) { amax = a; best = g; }
+      });
+      return d3.geoCentroid(best);
+    }
+    var LABEL_NUDGE = { NO: [-3, -2], FI: [0, -1], GB: [-1, 1] };   // gradi lon/lat, per staccare l'etichetta da coste e confini
+
+    var host = document.getElementById("chart");
+    var tip = R.tooltip(host);
+    var clearActive = function () {};
+    R.dismissOutside(host, function () { tip.hide(); clearActive(); });
+
+    R.responsive(host, function (W, phase) {
+      var narrow = R.isNarrow(W);
+      var side = W >= 640;
+      var mapW = side ? Math.round(W * 0.6) : W;
+      var mapH = Math.round(mapW * (side ? 1.02 : 1.05));
+      var rowH = 27, barH = 16;
+      var bx0 = side ? mapW + 28 : 0, bw = W - bx0;
+      var by0 = side ? 24 : mapH + 26;
+      var labelW = narrow ? 104 : 112, valW = narrow ? 92 : 104;
+      var H = Math.max(mapH, by0 + 22 + ranked.length * rowH);
+
+      var proj = d3.geoAzimuthalEqualArea().rotate([-10, -52]).fitExtent([[4, 4], [mapW - 4, mapH - 4]], frame);
+      var path = d3.geoPath(proj);
+
+      d3.select(host).select("svg").remove();
+      var svg = d3.select(host).insert("svg", ".r-tip").attr("width", W).attr("height", H)
+        .attr("role", "img")
+        .attr("aria-label", "Mappa dell'Europa e classifica: la quota di posti di autista scoperti è più alta nei Paesi Bassi (" +
+          fmt(top.qmax) + "%), poi Repubblica Ceca (" + fmt(byIso.CZ.qmax) + "%) e Spagna (" + fmt(byIso.ES.qmax) +
+          "%). In Italia è l'" + fmt(it.qmax) + "%, circa " + fmt(it.pmax) + " posti.");
+      svg.append("title").text("Quota di posti di autista di autobus scoperti per Paese, 2023");
+      var defs = svg.append("defs");
+      defs.append("clipPath").attr("id", "map-clip").append("rect").attr("width", mapW).attr("height", mapH);
+      var hatch = defs.append("pattern").attr("id", "hatch").attr("patternUnits", "userSpaceOnUse")
+        .attr("width", 5).attr("height", 5).attr("patternTransform", "rotate(45)");
+      hatch.append("rect").attr("width", 5).attr("height", 5).style("fill", "var(--blue-5)");
+      hatch.append("rect").attr("width", 2.5).attr("height", 5).style("fill", "var(--blue-3)");
+
+      // ---- mappa ----
+      var gm = svg.append("g").attr("clip-path", "url(#map-clip)");
+      function fillOf(f) {
+        var v = byIso[f.id];
+        if (v) return v.range ? "url(#hatch)" : cls(v.qmax).col;
+        return PERIM[f.id] ? "var(--grey-5)" : "var(--land-out)";
+      }
+      var lands = gm.selectAll("path.land").data(geo.features).join("path")
+        .attr("class", function (f) { return "land mark" + (PERIM[f.id] ? " has" : ""); })
+        .attr("d", path).style("fill", fillOf);
+      // Italia: contorno rosso sopra tutto
+      var itF = geo.features.filter(function (f) { return f.id === "IT"; });
+      gm.selectAll("path.it-out").data(itF).join("path").attr("class", "it-out").attr("d", path)
+        .style("fill", "none").style("stroke", "var(--red)").attr("stroke-width", narrow ? 1.75 : 2.25).attr("stroke-linejoin", "round")
+        .style("pointer-events", "none");
+      R.enter(lands, phase, function (s) { s.style("opacity", 0); }, function (s) { s.style("opacity", 1); });
+
+      // etichette con la quota
+      var labF = geo.features.filter(function (f) { return byIso[f.id]; });
+      // Paesi troppo piccoli: etichetta spostata in mare con una linea di richiamo (offset in pixel)
+      var LEADER = { NL: narrow ? [-26, -20] : [-34, -26] };
+      function labPos(f) {
+        var c = mainCentroid(f), n = LABEL_NUDGE[f.id] || [0, 0];
+        var p = proj([c[0] + n[0], c[1] + n[1]]), o = LEADER[f.id];
+        return o ? [p[0] + o[0], p[1] + o[1], p[0], p[1]] : [p[0], p[1]];
+      }
+      var ld = gm.append("g").attr("class", "anno");
+      labF.filter(function (f) { return LEADER[f.id]; }).forEach(function (f) {
+        var p = labPos(f);
+        ld.append("line").attr("x1", p[0] + 6).attr("y1", p[1] + 6).attr("x2", p[2]).attr("y2", p[3]);
+        ld.append("circle").attr("cx", p[2]).attr("cy", p[3]).attr("r", 2);
+      });
+      var labs = gm.selectAll("text.map-lab").data(labF).join("text").attr("class", "map-lab")
+        .attr("text-anchor", "middle").attr("dy", "0.35em")
+        .style("font-size", narrow ? "10.5px" : null)
+        .attr("transform", function (f) { var p = labPos(f); return "translate(" + p[0] + "," + p[1] + ")"; })
+        .text(function (f) { var v = byIso[f.id]; return v.range ? fmt(v.qmin) + "-" + fmt(v.qmax) + "%" : fmt(v.qmax) + "%"; });
+      R.enter(labs.merge(ld), phase, function (s) { s.style("opacity", 0); }, function (s) { s.style("opacity", 1); }, R.DUR * 0.7);
+
+      // ---- classifica ----
+      var bg = svg.append("g").attr("transform", "translate(" + bx0 + "," + by0 + ")");
+      bg.append("text").attr("class", "series-label").attr("y", 0).text("Paesi con una stima");
+      bg.append("text").attr("class", "series-label--sub").attr("y", 15).text("quota di posti scoperti e autisti mancanti");
+      var xb = d3.scaleLinear().domain([0, top.qmax]).range([0, bw - labelW - valW]);
+      var rowsG = bg.selectAll("g.row").data(ranked).join("g").attr("class", "row mark")
+        .attr("transform", function (d, i) { return "translate(0," + (30 + i * rowH) + ")"; });
+      rowsG.append("text").attr("class", "tick-label").attr("x", labelW - 8).attr("y", barH / 2).attr("dy", "0.35em")
+        .attr("text-anchor", "end")
+        .style("fill", function (d) { return d.iso === "IT" ? "var(--red)" : "var(--ink)"; })
+        .style("font-weight", function (d) { return d.iso === "IT" ? 700 : 500; })
+        .text(function (d) { return d.name; });
+      var bars = rowsG.append("path")
+        .style("fill", function (d) { return d.iso === "IT" ? "var(--red)" : d.range ? "url(#hatch)" : "var(--blue)"; });
+      function barD(d, k) { return R.barPathH(labelW, 0, xb(d.qmax) * k, barH, 2); }
+      bars.each(function (d) {
+        R.enter(d3.select(this), phase, function (s) { s.attr("d", barD(d, 0)); }, function (s) { s.attr("d", barD(d, 1)); }, 200);
+      });
+      var vl = rowsG.append("text").attr("class", "val-label").attr("x", function (d) { return labelW + xb(d.qmax) + 6; })
+        .attr("y", barH / 2).attr("dy", "0.35em");
+      vl.append("tspan").text(function (d) { return d.range ? fmt(d.qmin) + "-" + fmt(d.qmax) + "%" : fmt(d.qmax) + "%"; });
+      vl.append("tspan").attr("class", "val-label--muted").attr("dx", 6)
+        .text(function (d) { return d.range ? fmt(d.pmin / 1000) + "-" + fmt(d.pmax / 1000) + "mila" : fmt(d.pmax); });
+      R.enter(vl, phase, function (s) { s.style("opacity", 0); }, function (s) { s.style("opacity", 1); }, R.DUR * 0.8);
+
+      // ---- interazione: Paese e riga si accendono insieme ----
+      function activate(iso, px, py) {
+        var v = byIso[iso];
+        lands.classed("is-dimmed", function (f) { return PERIM[f.id] && f.id !== iso; });
+        rowsG.classed("is-dimmed", function (r) { return r.iso !== iso; });
+        var html = !v ? R.tipHTML({ title: PERIM[iso], note: "Compreso nel totale europeo, ma senza una stima nazionale" }) :
+          R.tipHTML({ title: v.name, value: v.range ? fmt(v.qmin) + "-" + fmt(v.qmax) + "%" : fmt(v.qmax) + "%", unit: "posti scoperti",
+            rows: [["Autisti mancanti", v.range ? fmt(v.pmin) + "-" + fmt(v.pmax) : fmt(v.pmax)]], note: v.note || null });
+        tip.show(html, px, py);
+      }
+      clearActive = function () { lands.classed("is-dimmed", false); rowsG.classed("is-dimmed", false); };
+      lands.filter(function (f) { return PERIM[f.id]; })
+        .on("pointerenter pointerdown pointermove", function (ev, f) { var q = d3.pointer(ev, host); activate(f.id, q[0], q[1]); })
+        .on("pointerleave", function (ev) { if (ev.pointerType === "mouse") { tip.hide(); clearActive(); } });
+      rowsG.style("cursor", "pointer").on("pointerenter pointerdown", function (ev, d) {
+        var q = d3.pointer(ev, host); activate(d.iso, q[0], q[1]);
+      }).on("pointerleave", function (ev) { if (ev.pointerType === "mouse") { tip.hide(); clearActive(); } });
+    });
+  }).catch(function (e) { R.fail("#chart", e); });
+})();
+</script>
+</body>
+</html>

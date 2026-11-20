@@ -1,0 +1,216 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Esami per la patente D superati in Italia – Radar QN</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Libre+Franklin:wght@400;500;600;700&family=Newsreader:opsz,wght@6..72,400;6..72,700&display=swap">
+<link rel="stylesheet" href="../assets/radar.css">
+<style>.sw--ring-b { border-radius: 50%; border: 2px solid var(--blue); background: var(--bg); }</style>
+<script src="https://cdn.jsdelivr.net/npm/d3@7"></script>
+<script src="../assets/radar.js"></script>
+</head>
+<body>
+<main class="radar">
+  <header>
+    <h1 class="r-title">Le patenti per guidare l'autobus sono crollate</h1>
+    <p class="r-sub">Esami per la patente D superati ogni anno in Italia, 1991–2025</p>
+  </header>
+
+  <div class="r-big" id="big" aria-hidden="true">
+    <span class="r-big__num" id="big-num">&nbsp;</span>
+    <span class="r-big__label" id="big-label"></span>
+  </div>
+
+  <figure class="r-chart" id="chart" style="margin-top:20px"></figure>
+  <div class="r-key"><span><i class="sw sw--ring-b"></i>Dato incoerente nella fonte, da verificare</span></div>
+  <p class="r-note">Il dato conta gli esami superati, non le persone né i nuovi autisti effettivamente assunti. Le fonti cambiano nel tempo: ministero dei Trasporti (rapporto 2011) fino al 2003, Agens per il 2004 e il 2005, ministero dei Trasporti (rapporto 2025) dal 2006.</p>
+
+  <footer class="r-foot">
+    <span>Fonte: ministero delle Infrastrutture e dei trasporti, Agens</span>
+    <span>Elaborazione Radar – QN</span>
+  </footer>
+</main>
+
+<script>
+(function () {
+  var R = Radar, fmt = R.fmt;
+  var BASE_YEAR = 2001;   // anno di confronto usato nell'articolo
+  function pctChange(a, b) { return (b / a - 1) * 100; }
+
+  R.loadCSV("../data/autisti-patenti-d.csv").then(function (rows) {
+    var data = rows.map(function (r) {
+      return { year: +r.anno, v: R.num(r.promossi), ko: R.num(r.respinti), tot: R.num(r.totale), src: r.fonte, note: r.nota || "" };
+    }).filter(function (d) { return d.year && d.v != null; })
+      .sort(function (a, b) { return a.year - b.year; });
+    data.forEach(function (d) { d.flag = d.note !== ""; });
+
+    var first = data[0], last = data[data.length - 1];
+    var byYear = {}; data.forEach(function (d) { byYear[d.year] = d; });
+    var base = byYear[BASE_YEAR];
+    // ripresa: risalendo dall'ultimo anno finché la serie cresce
+    var startUp = data.length - 1;
+    while (startUp > 0 && data[startUp - 1].v < data[startUp].v) startUp--;
+    var low = data[startUp];
+    // il crollo più forte in un anno
+    var drop = d3.least(data.slice(1), function (d) { return pctChange(byYear[d.year - 1].v, d.v); });
+    var dropPct = pctChange(byYear[drop.year - 1].v, drop.v);
+    var totalChange = pctChange(base.v, last.v);
+    var recovery = pctChange(low.v, last.v);
+    var peak = d3.greatest(data, function (d) { return d.v; });
+
+    // ---- Big number ----
+    var bigNum = d3.select("#big-num");
+    d3.select("#big-label").text("esami superati nel " + last.year + " rispetto al " + base.year +
+      ": da " + fmt(base.v) + " a " + fmt(last.v));
+    var bigFmt = function (v) { return fmt(v, 0) + "%"; };
+    if (R.reduced) bigNum.text(bigFmt(totalChange));
+    else {
+      bigNum.text(bigFmt(0));
+      R.onFirstView(document.getElementById("big"), function () { R.countUp(bigNum, totalChange, bigFmt, "play"); });
+    }
+
+    var host = document.getElementById("chart");
+    var tip = R.tooltip(host);
+    var clearActive = function () {};
+    R.dismissOutside(host, function () { tip.hide(); clearActive(); });
+
+    R.responsive(host, function (W, phase) {
+      var narrow = R.isNarrow(W);
+      var m = { top: 18, right: narrow ? 44 : 62, bottom: 30, left: narrow ? 34 : 42 };
+      var H = narrow ? 300 : 360;
+      var w = W - m.left - m.right, h = H - m.top - m.bottom;
+
+      var x = d3.scaleLinear().domain([first.year, last.year]).range([0, w]);
+      var yMax = Math.ceil(peak.v / 10000) * 10000;
+      var y = d3.scaleLinear().domain([0, yMax]).range([h, 0]);
+      var yTicks = d3.range(0, yMax + 1, narrow ? 20000 : 10000);
+
+      d3.select(host).select("svg").remove();
+      var svg = d3.select(host).insert("svg", ".r-tip")
+        .attr("width", W).attr("height", H)
+        .attr("role", "img")
+        .attr("aria-label", "Grafico a linee: gli esami per la patente D superati in Italia toccano il massimo di " +
+          fmt(peak.v) + " nel " + peak.year + ", sono " + fmt(base.v) + " nel " + base.year + " e " + fmt(last.v) + " nel " + last.year +
+          " (" + fmt(totalChange, 0) + "%). Dal minimo recente del " + low.year + " risalgono del " + fmt(recovery, 0) + "%.");
+      svg.append("title").text("Esami per la patente D superati in Italia, " + first.year + "–" + last.year);
+      var g = svg.append("g").attr("transform", "translate(" + m.left + "," + m.top + ")");
+
+      g.append("g").attr("class", "grid").selectAll("line").data(yTicks).join("line")
+        .attr("x1", 0).attr("x2", w)
+        .attr("y1", function (d) { return Math.round(y(d)) + 0.5; })
+        .attr("y2", function (d) { return Math.round(y(d)) + 0.5; })
+        .attr("class", function (d) { return d === 0 ? "baseline" : null; });
+      g.append("g").selectAll("text").data(yTicks).join("text")
+        .attr("class", "tick-label").attr("x", -8).attr("y", function (d) { return y(d); }).attr("dy", "0.35em")
+        .attr("text-anchor", "end")
+        .text(function (d) { return d === 0 ? "0" : fmt(d / 1000) + "mila"; });
+
+      // asse X: ogni 5 anni (10 su mobile), più il primo e l'ultimo
+      var step = narrow ? 10 : 5;
+      var years = data.map(function (d) { return d.year; }).filter(function (yr) {
+        return yr === first.year || yr === last.year || (yr % step === 0 && yr - first.year >= 3 && last.year - yr >= 3);
+      });
+      var xa = g.append("g").attr("transform", "translate(0," + h + ")");
+      xa.selectAll("line").data(years).join("line")
+        .attr("x1", function (d) { return Math.round(x(d)) + 0.5; })
+        .attr("x2", function (d) { return Math.round(x(d)) + 0.5; })
+        .attr("y1", 0).attr("y2", 5).style("stroke", "var(--ink)");
+      xa.selectAll("text").data(years).join("text")
+        .attr("class", "tick-label").attr("x", function (d) { return x(d); }).attr("y", 20)
+        .attr("text-anchor", "middle")
+        .text(function (d) { return narrow && d !== first.year && d !== last.year ? "’" + String(d).slice(2) : d; });
+
+      var line = d3.line().curve(d3.curveMonotoneX).x(function (d) { return x(d.year); }).y(function (d) { return y(d.v); });
+      var path = g.append("path").datum(data)
+        .style("fill", "none").style("stroke", "var(--blue)").attr("stroke-width", 2.25)
+        .attr("stroke-linejoin", "round").attr("stroke-linecap", "round").attr("d", line);
+      var L = path.node().getTotalLength();
+      R.enter(path, phase,
+        function (s) { s.attr("stroke-dasharray", L + " " + L).attr("stroke-dashoffset", L); },
+        function (s) { s.attr("stroke-dashoffset", 0); });
+
+      svg.append("defs").append("clipPath").attr("id", "clip-up").append("rect")
+        .attr("x", x(low.year)).attr("y", -m.top).attr("width", w - x(low.year) + 4).attr("height", H);
+      var redPath = g.append("path").datum(data).attr("clip-path", "url(#clip-up)")
+        .style("fill", "none").style("stroke", "var(--red)").attr("stroke-width", 2.75)
+        .attr("stroke-linejoin", "round").attr("stroke-linecap", "round").attr("d", line);
+      R.enter(redPath, phase, function (s) { s.style("opacity", 0); }, function (s) { s.style("opacity", 1); }, R.DUR * 0.8);
+
+      // annotazioni (max due)
+      var an = g.append("g").attr("class", "anno");
+      // 1) il crollo più forte in un anno
+      var ax = x(drop.year), ay = y(drop.v);
+      an.append("circle").attr("cx", ax).attr("cy", ay).attr("r", 2.5);
+      if (narrow) {
+        // su mobile a sinistra della curva, su due righe, per non toccare la nota della ripresa
+        var tx = ax - 10;
+        an.append("line").attr("x1", ax - 3).attr("y1", ay).attr("x2", tx + 4).attr("y2", ay);
+        var t1 = an.append("text").attr("x", tx).attr("y", ay).attr("dy", "-0.3em").attr("text-anchor", "end");
+        t1.append("tspan").attr("class", "em").text(drop.year + ": " + fmt(dropPct, 0) + "%");
+        an.append("text").attr("x", tx).attr("y", ay).attr("dy", "1.05em").attr("text-anchor", "end").text("in un anno");
+      } else {
+        var tx = ax + 18;
+        an.append("line").attr("x1", ax + 3).attr("y1", ay).attr("x2", tx - 4).attr("y2", ay);
+        var t1 = an.append("text").attr("x", tx).attr("y", ay).attr("dy", "0.35em");
+        t1.append("tspan").attr("class", "em").text(drop.year + ":");
+        t1.append("tspan").text(" " + fmt(dropPct, 0) + "% in un anno");
+      }
+      // 2) la ripresa
+      var bx = x(low.year), by = y(low.v);
+      var bty = y(Math.max(low.v, last.v)) - (narrow ? 40 : 50);
+      an.append("circle").attr("cx", bx).attr("cy", by).attr("r", 2.5);
+      an.append("line").attr("x1", bx).attr("x2", bx).attr("y1", by - 4).attr("y2", bty + 6);
+      an.append("text").attr("x", bx).attr("y", bty).attr("text-anchor", "middle").attr("dx", narrow ? -12 : 0)
+        .append("tspan").attr("class", "em").text("Dal " + low.year + ": +" + fmt(recovery, 0) + "%");
+      R.enter(an, phase, function (s) { s.style("opacity", 0); }, function (s) { s.style("opacity", 1); }, R.DUR * 0.5);
+
+      var cross = g.append("line").attr("class", "crosshair").attr("y1", 0).attr("y2", h).style("opacity", 0);
+      function baseR(p) { return p === last || p === base ? 4.5 : p.flag ? 3.5 : 0; }
+      var pts = g.append("g").selectAll("circle").data(data).join("circle")
+        .attr("class", "mark")
+        .attr("cx", function (d) { return x(d.year); }).attr("cy", function (d) { return y(d.v); })
+        .attr("r", baseR)
+        .style("fill", function (d) { return d.flag ? "var(--bg)" : d.year >= low.year ? "var(--red)" : "var(--blue)"; })
+        .style("stroke", function (d) { return d.flag ? "var(--blue)" : "var(--bg)"; })
+        .attr("stroke-width", function (d) { return d.flag ? 1.75 : 1.5; });
+      R.enter(pts, phase, function (s) { s.style("opacity", 0); }, function (s) { s.style("opacity", 1); }, R.DUR * 0.85);
+
+      // etichette dirette: anno di confronto e ultimo anno
+      var lab = g.append("g");
+      var bl = lab.append("g").attr("transform", "translate(" + x(base.year) + "," + (y(base.v) - 12) + ")");
+      bl.append("text").attr("class", "series-label").attr("text-anchor", "middle").text(fmt(base.v));
+      bl.append("text").attr("class", "series-label--sub").attr("text-anchor", "middle").attr("dy", "-1.25em").text(base.year);
+      var ll = lab.append("g").attr("transform", "translate(" + (x(last.year) + 8) + "," + y(last.v) + ")");
+      ll.append("text").attr("class", "series-label").attr("dy", "0.35em").style("fill", "var(--red)").text(fmt(last.v));
+      ll.append("text").attr("class", "series-label--sub").attr("dy", "1.65em").text(last.year);
+      lab.selectAll("text").style("paint-order", "stroke").style("stroke", "var(--bg)").style("stroke-width", "4px").style("stroke-linejoin", "round");
+      R.enter(lab, phase, function (s) { s.style("opacity", 0); }, function (s) { s.style("opacity", 1); }, R.DUR * 0.85);
+
+      function activate(d) {
+        var cx = x(d.year), cy = y(d.v);
+        cross.attr("x1", cx).attr("x2", cx).style("opacity", 1);
+        pts.attr("r", function (p) { return p === d ? 5.5 : baseR(p); });
+        var rowsT = [["Respinti", fmt(d.ko)], ["Esami sostenuti", fmt(d.tot)]];
+        if (!d.flag) rowsT.push(["Promossi", fmt(d.v / d.tot * 100, 1) + "%"]);
+        tip.show(R.tipHTML({
+          title: String(d.year), value: fmt(d.v), unit: "esami superati", rows: rowsT,
+          note: d.flag ? "Nella fonte promossi e respinti non sommano al totale: dato da verificare" : "Fonte: " + d.src
+        }), cx + m.left, cy + m.top);
+      }
+      clearActive = function () { cross.style("opacity", 0); pts.attr("r", baseR); };
+      g.append("rect").attr("class", "hit")
+        .attr("x", -6).attr("y", -m.top).attr("width", w + 12).attr("height", h + m.top)
+        .on("pointermove pointerdown", function (ev) {
+          var mx = d3.pointer(ev, g.node())[0];
+          activate(d3.least(data, function (d) { return Math.abs(x(d.year) - mx); }));
+        })
+        .on("pointerleave", function (ev) { if (ev.pointerType === "mouse") { tip.hide(); clearActive(); } });
+    });
+  }).catch(function (e) { R.fail("#chart", e); });
+})();
+</script>
+</body>
+</html>

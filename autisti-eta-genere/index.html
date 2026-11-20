@@ -1,0 +1,152 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Età e genere degli autisti di autobus in Italia – Radar QN</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Libre+Franklin:wght@400;500;600;700&family=Newsreader:opsz,wght@6..72,400;6..72,700&display=swap">
+<link rel="stylesheet" href="../assets/radar.css">
+<style>
+  .cls-val { font-size: 22px; font-weight: 700; letter-spacing: -0.02em; }
+  .cls-lab { font-size: 12.5px; fill: var(--ink-2); }
+  .panel-head { font-size: 15px; font-weight: 700; fill: var(--ink); }
+</style>
+<script src="https://cdn.jsdelivr.net/npm/d3@7"></script>
+<script src="../assets/radar.js"></script>
+</head>
+<body>
+<main class="radar">
+  <header>
+    <h1 class="r-title">Pochi giovani e pochissime donne alla guida degli autobus</h1>
+    <p class="r-sub">Autisti di autobus in Italia per fascia d'età e per genere, in percentuale</p>
+  </header>
+
+  <figure class="r-chart" id="chart" style="margin-top:20px"></figure>
+  <p class="r-note">Ogni figura vale l'1% degli autisti; le figure divise contengono due gruppi. I due dati vengono dalla stessa rilevazione ma non sono incrociati: non si sa quante donne ci siano in ciascuna fascia d'età. In Europa, secondo l'IRU, le donne sono il 16% degli autisti e gli under 25 circa il 3% (con fasce d'età diverse).</p>
+
+  <footer class="r-foot">
+    <span>Fonte: Basco&amp;T, in Agens 2025</span>
+    <span>Elaborazione Radar – QN</span>
+  </footer>
+</main>
+
+<script>
+(function () {
+  var R = Radar, fmt = R.fmt;
+  var AGE_COLORS = ["var(--red)", "var(--blue-4)", "var(--blue-3)", "var(--blue-1)"];
+
+  function person(g) {
+    g.append("circle").attr("cx", 5).attr("cy", 2.6).attr("r", 2.4);
+    g.append("path").attr("d", "M1,13.6V8.4Q1,5.8 3.6,5.8H6.4Q9,5.8 9,8.4V13.6Z");
+  }
+  function cumulate(arr) { var acc = 0; arr.forEach(function (d) { d.a = acc; acc += d.v; d.b = acc; }); return arr; }
+  function dec(v) { return v % 1 ? 1 : 0; }
+
+  Promise.all([R.loadCSV("../data/autisti-eta.csv"), R.loadCSV("../data/autisti-donne.csv")]).then(function (res) {
+    var age = cumulate(res[0].map(function (r, i) { return { name: r.fascia, v: R.num(r.quota), col: AGE_COLORS[i], hi: i === 0 }; }));
+    var womenIt = R.num(res[1][0].quota);   // prima riga: autisti di autobus in Italia
+    var gender = cumulate([
+      { name: "Donne", v: womenIt, col: "var(--red)", hi: true },
+      { name: "Uomini", v: +(100 - womenIt).toFixed(1), col: "var(--grey-4)" }
+    ]);
+    var panels = [
+      { key: "age", title: "Per fascia d'età", data: age, legend: age.slice().reverse() },
+      { key: "gender", title: "Per genere", data: gender, legend: gender }
+    ];
+
+    var host = document.getElementById("chart");
+    var tip = R.tooltip(host);
+    var clearActive = function () {};
+    R.dismissOutside(host, function () { tip.hide(); clearActive(); });
+
+    R.responsive(host, function (W, phase) {
+      var narrow = R.isNarrow(W);
+      var pgap = narrow ? 18 : 48;
+      var pw = (W - pgap) / 2;                              // due pannelli sempre affiancati
+      var gapX = narrow ? 3 : 6, gapY = narrow ? 4 : 6;
+      var iw = Math.min(24, Math.floor((pw - 9 * gapX) / 10));
+      var ih = iw * 1.4;
+      var gw = 10 * iw + 9 * gapX, gh = 10 * ih + 9 * gapY;
+      var headH = 30, legRow = narrow ? 42 : 50;
+      var legCols = narrow ? 1 : 2;
+      var legRows = d3.max(panels, function (P) { return Math.ceil(P.legend.length / legCols); });
+      var H = headH + gh + 22 + legRows * legRow;
+      d3.select(host).select("svg").remove();
+      var svg = d3.select(host).insert("svg", ".r-tip").attr("width", W).attr("height", H)
+        .attr("role", "img")
+        .attr("aria-label", "Due pittogrammi di 100 figure. Per età: " + age.map(function (d) { return d.name.toLowerCase() + " " + fmt(d.v, 1) + "%"; }).join(", ") +
+          ". Per genere: donne " + fmt(womenIt, 1) + "%, uomini " + fmt(100 - womenIt, 1) + "%.");
+      svg.append("title").text("Autisti di autobus in Italia per età e per genere");
+      var defs = svg.append("defs");
+      var allParts = [], allItems = [];
+
+      panels.forEach(function (P, pi) {
+        var ox = pi * (pw + pgap), oy = 0;
+        var gp = svg.append("g").attr("transform", "translate(" + ox + "," + oy + ")");
+        gp.append("text").attr("class", "panel-head").attr("y", 15).style("font-size", narrow ? "13.5px" : null).text(P.title);
+        var gx = 0;
+        var g = gp.append("g").attr("transform", "translate(" + gx + "," + headH + ")");
+
+        var cells = d3.range(100).map(function (i) {
+          return { i: i, parts: P.data.filter(function (d) { return d.a < i + 1 && d.b > i; }).map(function (d) {
+            return { d: d, f0: Math.max(0, d.a - i), f1: Math.min(1, d.b - i), i: i };
+          }) };
+        });
+        var cg = g.selectAll("g.cell").data(cells).join("g").attr("class", "cell")
+          .attr("transform", function (c) {
+            return "translate(" + (c.i % 10) * (iw + gapX) + "," + Math.floor(c.i / 10) * (ih + gapY) + ") scale(" + (iw / 10) + ")";
+          });
+        var parts = cg.selectAll("g.part").data(function (c) { return c.parts; }).join("g").attr("class", "part mark")
+          .each(function (p, k) {
+            var s = d3.select(this);
+            if (p.f0 > 0 || p.f1 < 1) {
+              var id = "cp-" + P.key + "-" + p.i + "-" + k;
+              defs.append("clipPath").attr("id", id).append("rect")
+                .attr("x", p.f0 * 10).attr("y", 0).attr("width", (p.f1 - p.f0) * 10).attr("height", 14);
+              s.attr("clip-path", "url(#" + id + ")");
+            }
+            person(s);
+            s.selectAll("circle,path").style("fill", p.d.col);
+          });
+        cg.each(function (c) {
+          R.enter(d3.select(this), phase, function (s) { s.style("opacity", 0); }, function (s) { s.style("opacity", 1); }, pi * 250 + c.i * 5);
+        });
+        allParts.push(parts);
+
+        // legenda sotto il blocco, su due colonne
+        var lg = gp.append("g").attr("transform", "translate(" + gx + "," + (headH + gh + 22) + ")");
+        var colW = pw / legCols;
+        var items = lg.selectAll("g").data(P.legend).join("g").attr("class", "mark")
+          .attr("transform", function (d, i) { return "translate(" + (i % legCols) * colW + "," + (Math.floor(i / legCols) * legRow + 20) + ")"; });
+        items.append("g").attr("transform", "translate(0,-17) scale(1.15)").each(function (d) {
+          var s = d3.select(this); person(s); s.selectAll("circle,path").style("fill", d.col);
+        });
+        var vt = items.append("text").attr("class", "cls-val").attr("x", 19).attr("y", 0).style("font-size", narrow ? "18px" : null)
+          .style("fill", function (d) { return d.hi ? "var(--red)" : "var(--ink)"; });
+        items.append("text").attr("class", "cls-lab").attr("x", 19).attr("y", narrow ? 16 : 18).style("font-size", narrow ? "11.5px" : null).text(function (d) { return d.name; });
+        vt.each(function (d) { R.countUp(d3.select(this), d.v, function (v) { return fmt(v, 1) + "%"; }, phase, 200 + pi * 250); });
+        allItems.push(items);
+      });
+
+      function activate(d, px, py) {
+        allParts.forEach(function (s) { s.classed("is-dimmed", function (p) { return p.d !== d; }); });
+        allItems.forEach(function (s) { s.classed("is-dimmed", function (x) { return x !== d; }); });
+        tip.show(R.tipHTML({ title: d.name, value: fmt(d.v, 1) + "%", unit: "degli autisti" }), px, py);
+      }
+      clearActive = function () {
+        allParts.forEach(function (s) { s.classed("is-dimmed", false); });
+        allItems.forEach(function (s) { s.classed("is-dimmed", false); });
+      };
+      allParts.concat(allItems).forEach(function (sel) {
+        sel.style("cursor", "pointer").on("pointerenter pointerdown", function (ev, x) {
+          var q = d3.pointer(ev, host); activate(x.d || x, q[0], q[1]);
+        }).on("pointerleave", function (ev) { if (ev.pointerType === "mouse") { tip.hide(); clearActive(); } });
+      });
+    });
+  }).catch(function (e) { R.fail("#chart", e); });
+})();
+</script>
+</body>
+</html>

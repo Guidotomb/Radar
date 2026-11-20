@@ -1,0 +1,11 @@
+voce;percorso;min;max;fonte
+patente_d;tutti;1200;1500;ACI, L'Automobile (spesa media in autoscuola per chi ha già la patente B)
+cqc;accelerato;1200;2500;Autoaccise (1.200-1.500 euro chiavi in mano), Randstad (media 2.500 euro)
+cqc;ordinario;1800;3000;Autoaccise (1.800-2.500 euro), Randstad (fino a 3.000 euro e oltre)
+esami_bolli_visita;tutti;100;130;ACI (marche da bollo circa 70 euro), visita medica 30-60 euro
+bonus_quota;;80;80;Ministero delle Infrastrutture e dei trasporti
+bonus_max;;2500;2500;Ministero delle Infrastrutture e dei trasporti
+bonus_eta_min;;18;18;Ministero delle Infrastrutture e dei trasporti
+bonus_eta_max;;35;35;Ministero delle Infrastrutture e dei trasporti
+stipendio_lordo;;1693,12;1693,12;Ccnl autoferrotranvieri, parametro 140 dal 1° agosto 2026: minimo 1.118,22 + contingenza 533,58 + Tdr 41,32
+stipendio_netto;;1400;1400;Stima Radar sul minimo contrattuale lordo, 14 mensilità, senza indennità e straordinari

@@ -1,0 +1,11 @@
+paese;iso2;quota_min;quota_max;posti_min;posti_max;nota
+Paesi Bassi;NL;20;20;6000;6000;
+Repubblica Ceca;CZ;16;16;3000;3000;
+Spagna;ES;14;14;11000;11000;
+Italia;IT;11;11;10000;10000;
+Germania;DE;10;10;15000;15000;
+Finlandia;FI;10;10;3000;3000;
+Regno Unito;GB;9;9;9000;9000;Non fa parte dell'Ue
+Polonia;PL;5;5;1000;1000;
+Francia;FR;7;11;9000;15000;Stima in forma di intervallo
+Totale (Ue-27, Regno Unito, Norvegia, Svizzera);TOT;10;10;105000;105000;Totale stimato dall'IRU, non solo i Paesi con dato
