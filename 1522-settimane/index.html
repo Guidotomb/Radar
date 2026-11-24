@@ -1,0 +1,166 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Le chiamate al 1522 settimana per settimana – Radar QN</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Libre+Franklin:wght@400;500;600;700&family=Newsreader:opsz,wght@6..72,400;6..72,700&display=swap">
+<link rel="stylesheet" href="../assets/radar.css">
+<script src="https://cdn.jsdelivr.net/npm/d3@7"></script>
+<script src="../assets/radar.js"></script>
+</head>
+<body>
+<main class="radar">
+  <header>
+    <h1 class="r-title">Ogni 25 novembre il 1522 squilla di più</h1>
+    <p class="r-sub">Vittime che chiamano il numero antiviolenza e antistalking 1522, settimana per settimana</p>
+  </header>
+
+  <div class="r-big" id="big" aria-hidden="true">
+    <span><span class="r-big__num" id="big-num">&nbsp;</span><span class="r-big__unit">%</span></span>
+    <span class="r-big__label" id="big-label"></span>
+  </div>
+
+  <figure class="r-chart" id="linea"></figure>
+  <div class="r-key" id="key"></div>
+  <p class="r-note">Dati settimanali disponibili fino a settembre 2024. Dal 2025 il 1522 registra le chiamate in modo diverso, e i numeri non sono confrontabili con gli anni precedenti.</p>
+
+  <footer class="r-foot">
+    <span>Fonte: Istat su dati del Dipartimento per le Pari opportunità</span>
+    <span>Elaborazione Radar – QN</span>
+  </footer>
+</main>
+
+<script>
+(function () {
+  var R = Radar, fmt = R.fmt;
+  var parseD = d3.timeParse("%Y-%m-%d");
+  var dFull = R.timeLocale.format("%e %B %Y"), dDM = R.timeLocale.format("%e %B");
+
+  R.loadCSV("../data/1522-settimanale.csv").then(function (rows) {
+    var data = rows.map(function (r) {
+      var s = parseD(r["Inizio settimana"]), e = parseD(r["Fine settimana"]);
+      var y = s.getFullYear(), nov25 = new Date(y, 10, 25);
+      return { s: s, e: e, mid: d3.timeDay.offset(s, 3), v: R.num(r["Vittime che chiamano il 1522"]), y: y, is25: s <= nov25 && nov25 <= e,
+        ok: r["Dati completi"] === "Sì" };
+    });
+    var years = d3.groups(data, function (d) { return d.y; });
+    // per ogni anno completo: la settimana del 25 novembre rispetto alla settimana media dell'anno
+    var ratios = years.map(function (g) {
+      var k = g[1].find(function (d) { return d.is25; });
+      return k ? k.v / d3.mean(g[1].filter(function (d) { return d.ok; }), function (d) { return d.v; }) : null;
+    }).filter(function (x) { return x != null; });
+    var avgRatio = d3.mean(ratios);
+    var y0 = d3.min(years, function (g) { return g[0]; });
+    var lastFull = d3.max(data.filter(function (d) { return d.is25; }), function (d) { return d.y; });
+    var max = data.reduce(function (a, b) { return b.v > a.v ? b : a; });
+    var nov25 = data.filter(function (d) { return d.is25; });
+
+    // ---- Big number ----
+    var bigNum = d3.select("#big-num"), fp = function (v) { return "+" + fmt(v, 0); };
+    d3.select("#big-label").text("in media, nella settimana del 25 novembre, le vittime che chiedono aiuto al 1522 rispetto a una settimana qualsiasi dello stesso anno (" + y0 + "-" + lastFull + ")");
+    var big = (avgRatio - 1) * 100;
+    if (R.reduced) bigNum.text(fp(big));
+    else { bigNum.text(fp(0)); R.onFirstView(document.getElementById("big"), function () { R.countUp(bigNum, big, fp, "play"); }); }
+    d3.select("#key").html('<span><i class="sw" style="background:var(--blue);height:2px;border-radius:0"></i>Vittime per settimana</span>' +
+      '<span><i class="sw" style="background:var(--red);border-radius:50%"></i>Settimana del 25 novembre</span>' +
+      '<span><i class="sw" style="background:none;border-top:2px dashed var(--grey);height:0;border-radius:0"></i>Dati incompleti (inizio 2023)</span>');
+
+    // annotazioni: lockdown 2020 e novembre 2023
+    var lock = data.filter(function (d) { return d.y === 2020 && d.s.getMonth() >= 2 && d.s.getMonth() <= 4; })
+      .reduce(function (a, b) { return b.v > a.v ? b : a; });
+    var gc = data.filter(function (d) { return d.y === 2023 && d.s.getMonth() >= 10; })
+      .reduce(function (a, b) { return b.v > a.v ? b : a; });
+
+    var host = document.getElementById("linea");
+    var tip = R.tooltip(host);
+    var clear = function () {};
+    R.dismissOutside(host, function () { tip.hide(); clear(); });
+
+    R.responsive(host, function (W, phase) {
+      var narrow = R.isNarrow(W);
+      var m = { top: 64, right: 8, bottom: 26, left: narrow ? 30 : 34 };
+      var H = narrow ? 320 : 380;
+      var w = W - m.left - m.right, h = H - m.top - m.bottom;
+      var x = d3.scaleTime().domain([data[0].s, data[data.length - 1].e]).range([0, w]);
+      var y = d3.scaleLinear().domain([0, d3.max(data, function (d) { return d.v; })]).nice().range([h, 0]);
+
+      d3.select(host).select("svg").remove();
+      var svg = d3.select(host).insert("svg", ".r-tip").attr("width", W).attr("height", H).attr("role", "img")
+        .attr("aria-label", "Grafico a linea: le vittime che chiamano il 1522 ogni settimana dal " + y0 + " a settembre 2024. Ogni anno la settimana del 25 novembre è tra le più alte: in media il " +
+          fmt(big, 0) + "% in più di una settimana qualsiasi. Il massimo è " + fmt(max.v, 0) + " vittime nella settimana dal " + dFull(max.s) + ".");
+      svg.append("title").text("Vittime che chiamano il 1522 per settimana");
+      var g = svg.append("g").attr("transform", "translate(" + m.left + "," + m.top + ")");
+
+      var ticks = y.ticks(narrow ? 3 : 4);
+      g.append("g").attr("class", "grid").selectAll("line").data(ticks).join("line")
+        .attr("x1", -m.left).attr("x2", w)
+        .attr("y1", function (d) { return Math.round(y(d)) + 0.5; }).attr("y2", function (d) { return Math.round(y(d)) + 0.5; })
+        .attr("class", function (d) { return d === 0 ? "baseline" : null; });
+      g.append("g").selectAll("text").data(ticks).join("text").attr("class", "tick-label")
+        .attr("x", -m.left).attr("y", function (d) { return y(d) - 5; }).text(function (d) { return fmt(d, 0); });
+      var yt = d3.range(y0, 2025).filter(function (yr) { return !narrow || yr % 2 === 1; });
+      g.append("g").selectAll("text").data(yt).join("text").attr("class", "tick-label").attr("text-anchor", "middle")
+        .attr("x", function (yr) { return x(new Date(yr, 6, 1)); }).attr("y", h + 18)
+        .text(function (yr) { return narrow ? "’" + String(yr).slice(2) : yr; });
+
+      var line = d3.line().defined(function (d) { return d.ok; }).x(function (d) { return x(d.mid); }).y(function (d) { return y(d.v); }).curve(d3.curveMonotoneX);
+      // settimane con dati incompleti: tratteggio, a cavallo con le settimane complete vicine
+      var iBad = data.map(function (d, i) { return d.ok ? -1 : i; }).filter(function (i) { return i >= 0; });
+      var bad = data.slice(Math.max(0, iBad[0] - 1), iBad[iBad.length - 1] + 2);
+      g.append("path").datum(bad).attr("d", d3.line().x(function (d) { return x(d.mid); }).y(function (d) { return y(d.v); }))
+        .style("fill", "none").style("stroke", "var(--grey)").style("stroke-width", 1.2).style("stroke-dasharray", "3 3");
+      var path = g.append("path").datum(data).attr("class", "mark").attr("d", line)
+        .style("fill", "none").style("stroke", "var(--blue)").style("stroke-width", narrow ? 1.1 : 1.3).style("stroke-linejoin", "round");
+      var L = path.node().getTotalLength();
+      R.enter(path, phase,
+        function (s) { s.attr("stroke-dasharray", L + " " + L).attr("stroke-dashoffset", L); },
+        function (s) { s.attr("stroke-dashoffset", 0); });
+      if (phase === "static") path.attr("stroke-dasharray", null);
+
+      var dots = g.append("g").selectAll("circle").data(nov25).join("circle")
+        .attr("cx", function (d) { return x(d.mid); }).attr("cy", function (d) { return y(d.v); })
+        .style("fill", "var(--red)").style("stroke", "var(--bg)").style("stroke-width", 1.5);
+      R.enter(dots, phase, function (s) { s.attr("r", 0); }, function (s) { s.attr("r", narrow ? 3 : 3.75); }, R.DUR * 0.8);
+
+      // annotazioni
+      var an = g.append("g").attr("class", "anno");
+      function anno(d, lines) {
+        var px = x(d.mid), py = y(d.v) - 6, ty = -m.top + 14;
+        var t = an.append("text").attr("x", px - 6).attr("y", ty).attr("text-anchor", "end");
+        lines.forEach(function (l, i) { t.append("tspan").attr("x", px - 6).attr("dy", i ? 16 : 0).attr("class", i === 0 ? "em" : null).text(l); });
+        an.append("path").attr("d", "M" + px + "," + (ty - 10) + "V" + py);
+        an.append("circle").attr("cx", px).attr("cy", py).attr("r", 1.75);
+      }
+      if (!narrow) anno(lock, ["Lockdown", "primavera 2020"]);
+      anno(gc, ["Novembre 2023:", "femminicidio di", "Giulia Cecchettin"]);
+      R.enter(an, phase, function (s) { s.style("opacity", 0); }, function (s) { s.style("opacity", 1); }, R.DUR * 0.8);
+
+      // crosshair e tooltip
+      var ch = g.append("line").attr("class", "crosshair").attr("y1", 0).attr("y2", h).style("opacity", 0);
+      var hp = g.append("circle").attr("r", 4).style("fill", "var(--ink)").style("pointer-events", "none").style("opacity", 0);
+      clear = function () { ch.style("opacity", 0); hp.style("opacity", 0); };
+      var bis = d3.bisector(function (d) { return d.mid; }).center;
+      g.append("rect").attr("class", "hit").attr("width", w).attr("height", h + m.top).attr("y", -m.top)
+        .on("pointermove pointerdown", function (ev) {
+          var d = data[bis(data, x.invert(d3.pointer(ev)[0]))];
+          ch.attr("x1", x(d.mid)).attr("x2", x(d.mid)).style("opacity", 1);
+          hp.attr("cx", x(d.mid)).attr("cy", y(d.v)).style("opacity", 1).style("fill", d.is25 ? "var(--red)" : "var(--ink)");
+          var yrAvg = d3.mean(data.filter(function (q) { return q.y === d.y && q.ok; }), function (q) { return q.v; });
+          tip.show(R.tipHTML({
+            title: "Dal " + dDM(d.s).trim() + " al " + dFull(d.e).trim(),
+            value: fmt(d.v, 0), unit: "vittime",
+            rows: [["Media settimanale " + d.y, fmt(yrAvg, 0)]],
+            note: !d.ok ? "Dati incompleti: in queste settimane gran parte delle chiamate non è attribuita a una provincia"
+              : d.is25 ? "Settimana del 25 novembre, Giornata internazionale contro la violenza sulle donne" : (d === max ? "Il valore più alto della serie" : null)
+          }), x(d.mid) + m.left, y(d.v) + m.top);
+        })
+        .on("pointerleave", function (ev) { if (ev.pointerType === "mouse") { tip.hide(); clear(); } });
+    });
+  }).catch(function (e) { R.fail("#linea", e); });
+})();
+</script>
+</body>
+</html>

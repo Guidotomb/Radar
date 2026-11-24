@@ -1,0 +1,273 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Reddito di libertà, fondi e richieste di aiuto per regione – Radar QN</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Libre+Franklin:wght@400;500;600;700&family=Newsreader:opsz,wght@6..72,400;6..72,700&display=swap">
+<link rel="stylesheet" href="../assets/radar.css">
+<script src="https://cdn.jsdelivr.net/npm/d3@7"></script>
+<script src="../assets/radar.js"></script>
+<style>
+  /* interruttore tra le due viste */
+  .r-switch { display: inline-flex; border: 1px solid var(--rule); border-radius: 3px; padding: 2px; margin: 22px 0 0; gap: 2px; }
+  .r-switch button {
+    font: 600 13px/1 var(--sans); color: var(--ink-2); background: transparent;
+    border: 0; border-radius: 2px; padding: 8px 12px; cursor: pointer;
+  }
+  .r-switch button[aria-pressed="true"] { background: var(--ink); color: var(--bg); }
+  .r-switch button:focus-visible { outline: 2px solid var(--blue); outline-offset: 1px; }
+    .r-key .sw--na {
+    background: repeating-linear-gradient(135deg, var(--grey-4) 0 2px, var(--bg) 2px 4px);
+    border: 1px solid var(--grey-4);
+  }
+  .r-key .sw--ringred { border-radius: 2px; border: 2px solid var(--red); background: transparent; }
+  .r-key .sw--dot { border-radius: 50%; background: var(--blue); }
+  .r-anno-m { font-size: 13px; line-height: 1.4; color: var(--ink); margin: 10px 0 0; }
+  .r-anno-m b { font-weight: 600; }
+</style>
+</head>
+<body>
+<main class="radar">
+  <header>
+    <h1 class="r-title"><span>Stessi soldi per ogni donna,</span><span>bisogni diversi</span></h1>
+    <p class="r-sub">Reddito di libertà 2026: come è diviso il fondo tra le regioni e quante vittime chiedono aiuto al 1522</p>
+  </header>
+
+  <div class="r-big" id="big" aria-hidden="true">
+    <span><span class="r-big__num" id="big-num">&nbsp;</span> <span class="r-big__unit">euro</span></span>
+    <span class="r-big__label" id="big-label"></span>
+  </div>
+
+  <div class="r-switch" role="group" aria-label="Scegli la vista">
+    <button type="button" data-mode="aiuti" aria-pressed="true">Aiuti</button>
+    <button type="button" data-mode="richieste" aria-pressed="false">Richieste di aiuto</button>
+  </div>
+
+  <figure class="r-chart" id="mappa">
+    <p class="r-chart__head" id="map-head"></p>
+    <p class="r-chart__sub" id="map-sub"></p>
+  </figure>
+  <div class="r-key" id="key"></div>
+  <p class="r-note" id="note"></p>
+
+  <footer class="r-foot">
+    <span>Fonte: Dipartimento per le Pari opportunità, Inps (messaggio 3110/2026), Istat, Il Resto del Carlino</span>
+    <span>Elaborazione Radar – QN</span>
+  </footer>
+</main>
+
+<script>
+(function () {
+  var R = Radar, fmt = R.fmt;
+  var ASSEGNO = 530 * 12;   // assegno pieno: 530 euro per 12 mesi
+  // piccoli spostamenti dei cerchi dove il baricentro cade male (pixel su una mappa larga 440)
+  var NUDGE = { "Liguria": [4, -6], "Campania": [-4, 4], "Lombardia": [0, -2] };
+  // domande 2026 nelle Marche (Il Resto del Carlino, 22 novembre 2026)
+  var MARCHE = { domande: 142, accolte: 80 };
+  // classi delle chiamate al 1522 ogni 100mila donne
+  var BREAKS = [55, 70, 85, 100];
+  var CLASS_FILL = ["var(--blue-5)", "var(--blue-4)", "var(--blue-3)", "var(--blue-2)", "var(--blue-1)"];
+  var CLASS_LABEL = ["meno di 55", "55–70", "70–85", "85–100", "100 e oltre"];
+
+  Promise.all([R.loadCSV("../data/rdl-regioni.csv"), fetch("../data/regioni-italia.geojson").then(function (r) { return r.json(); })]).then(function (res) {
+    var rows = res[0], geo = res[1];
+    // d3 vuole gli anelli esterni in senso orario: se una regione "copre il mondo", la giro
+    geo.features.forEach(function (f) {
+      if (d3.geoArea(f) > 2 * Math.PI) f.geometry.coordinates.forEach(function (p) { p.forEach(function (r) { r.reverse(); }); });
+    });
+    var byName = {}; geo.features.forEach(function (f) { byName[f.properties.regione] = f; });
+    var reg = rows.map(function (r) {
+      var pop = R.num(r["Donne 18-67 anni"]);
+      var budget = pop == null ? null :
+        R.num(r["Quota 10 milioni"]) + R.num(r["Quota 1 milione"]) + R.num(r["Quota 5,5 milioni"]) + R.num(r["Quota straordinaria 3,9 milioni"]);
+      var calls = R.num(r["Vittime che chiamano il 1522 (2024)"]);
+      return {
+        name: r["Regione"], f: byName[r["Regione"]], pop: pop, budget: budget,
+        assegni: budget == null ? null : Math.floor(budget / ASSEGNO),
+        calls: calls, rate: pop == null ? null : calls / pop * 1e5, na: pop == null
+      };
+    });
+    var ok = reg.filter(function (d) { return !d.na; });
+    var totBudget = d3.sum(ok, function (d) { return d.budget; });
+    var totPop = d3.sum(ok, function (d) { return d.pop; });
+    var perDonna = totBudget / totPop;
+    var itRate = d3.sum(ok, function (d) { return d.calls; }) / totPop * 1e5;
+    var mar = reg.find(function (d) { return d.name === "Marche"; });
+    var low = ok.reduce(function (a, b) { return b.rate < a.rate ? b : a; });
+    var high = ok.reduce(function (a, b) { return b.rate > a.rate ? b : a; });
+    var maxAss = d3.max(ok, function (d) { return d.assegni; });
+    var cls = function (v) { return d3.bisectRight(BREAKS, v); };
+    var f0 = function (v) { return fmt(v, 0); }, f2 = function (v) { return fmt(v, 2); };
+    var mln = function (v) { return fmt(v / 1e6, 1) + " milioni"; };
+
+    // ---- Big number ----
+    var bigNum = d3.select("#big-num");
+    d3.select("#big-label").text("per ogni donna tra 18 e 67 anni: il fondo 2026, " + mln(totBudget) +
+      " di euro, dà a tutte le regioni la stessa cifra per residente");
+    if (R.reduced) bigNum.text(f2(perDonna));
+    else { bigNum.text(f2(0)); R.onFirstView(document.getElementById("big"), function () { R.countUp(bigNum, perDonna, f2, "play"); }); }
+
+    var TEXT = {
+      aiuti: {
+        head: "Assegni pieni pagabili con il fondo 2026",
+        sub: "Cerchi proporzionali al numero di assegni da " + f0(ASSEGNO) + " euro (530 euro al mese per un anno)"
+      },
+      richieste: {
+        head: "Vittime che hanno chiamato il 1522 nel 2024",
+        sub: "Ogni 100mila donne tra 18 e 67 anni. Media italiana: " + f0(itRate)
+      }
+    };
+    var mode = "aiuti";
+    var host = document.getElementById("mappa");
+    var tip = R.tooltip(host);
+    var clear = function () {};
+    R.dismissOutside(host, function () { tip.hide(); clear(); });
+    var redraw = function () {};
+
+    function keyHTML() {
+      if (mode === "aiuti") {
+        return '<span><i class="sw sw--dot"></i>Assegni pagabili</span>' +
+          '<span><i class="sw" style="background:var(--red);border-radius:50%"></i>Marche</span>' +
+          '<span><i class="sw sw--na"></i>Non partecipa al riparto</span>';
+      }
+      return CLASS_LABEL.map(function (l, i) { return '<span><i class="sw" style="background:' + CLASS_FILL[i] + '"></i>' + l + "</span>"; }).join("") +
+        '<span><i class="sw sw--ringred"></i>Marche</span><span><i class="sw sw--na"></i>Non calcolato</span>';
+    }
+    function setTexts() {
+      d3.select("#map-head").text(TEXT[mode].head);
+      d3.select("#map-sub").text(TEXT[mode].sub);
+      d3.select("#key").html(keyHTML());
+      d3.select("#note").text(mode === "aiuti"
+        ? "Il budget 2026 somma le quote statali (16,5 milioni) e lo stanziamento straordinario di ottobre (3,9 milioni). La quota di 5,5 milioni della legge di Bilancio 2026 è ripartita con lo stesso criterio delle altre, la popolazione femminile tra 18 e 67 anni. Il Trentino-Alto Adige ha una propria misura analoga e non partecipa al riparto."
+        : "Chiamate al 1522 da parte di vittime, per regione di provenienza. Per il Trentino-Alto Adige il tasso non è calcolato: " + f0(reg.find(function (d) { return d.na; }).calls) + " chiamate nel 2024.");
+    }
+    d3.selectAll(".r-switch button").on("click", function () {
+      var m = this.getAttribute("data-mode");
+      if (m === mode) return;
+      mode = m;
+      d3.selectAll(".r-switch button").attr("aria-pressed", function () { return this.getAttribute("data-mode") === mode; });
+      tip.hide(); setTexts(); redraw(true);
+      R.scheduleHeight();
+    });
+    setTexts();
+
+    R.responsive(host, function (W, phase) {
+      var narrow = R.isNarrow(W);
+      var mapW = narrow ? W : Math.min(490, W - 230);
+      var mapH = Math.round(mapW * 1.17);
+      var annoX = mapW + 24, annoW = W - annoX;
+      var proj = d3.geoConicConformal().parallels([38, 44]).rotate([-12.5, 0]).fitSize([mapW, mapH], geo);
+      var path = d3.geoPath(proj);
+      var rScale = d3.scaleSqrt().domain([0, maxAss]).range([0, narrow ? 17 : 24]);
+      reg.forEach(function (d) {
+        var c = path.centroid(d.f);
+        var nud = NUDGE[d.name] || [0, 0];
+        d.cx = c[0] + nud[0] * mapW / 440; d.cy = c[1] + nud[1] * mapW / 440;
+      });
+
+      d3.select(host).select("svg").remove();
+      var svg = d3.select(host).insert("svg", ".r-tip").attr("width", W).attr("height", mapH).attr("role", "img");
+      svg.append("title").text("Reddito di libertà per regione");
+      var defs = svg.append("defs");
+      defs.append("pattern").attr("id", "hatch").attr("width", 5).attr("height", 5).attr("patternUnits", "userSpaceOnUse")
+        .attr("patternTransform", "rotate(45)")
+        .append("rect").attr("width", 1.6).attr("height", 5).style("fill", "var(--grey-4)");
+      var g = svg.append("g");
+
+      var shapes = g.append("g").selectAll("path").data(reg).join("path").attr("class", "mark")
+        .attr("d", function (d) { return path(d.f); })
+        .style("stroke", "var(--bg)").style("stroke-width", 1).style("stroke-linejoin", "round");
+      var marOutline = g.append("path").attr("d", path(mar.f)).style("fill", "none")
+        .style("stroke", "var(--red)").style("stroke-width", 2).style("pointer-events", "none");
+      var hover = g.append("path").style("fill", "none").style("stroke", "var(--ink)").style("stroke-width", 1.5)
+        .style("pointer-events", "none");
+      var circ = g.append("g").style("pointer-events", "none").selectAll("circle")
+        .data(ok.slice().sort(function (a, b) { return b.assegni - a.assegni; })).join("circle")
+        .attr("cx", function (d) { return d.cx; }).attr("cy", function (d) { return d.cy; })
+        .style("fill", function (d) { return d === mar ? "var(--red)" : "var(--blue)"; })
+        .style("fill-opacity", 0.85).style("stroke", "var(--bg)").style("stroke-width", 1);
+
+      function fillOf(d) {
+        if (d.na) return "url(#hatch)";
+        return mode === "aiuti" ? "var(--grey-5)" : CLASS_FILL[cls(d.rate)];
+      }
+      function paint(animate) {
+        var t = animate ? d3.transition().duration(R.DUR).ease(R.EASE) : null;
+        var on = function (sel) { return t ? sel.transition(t) : sel; };
+        on(shapes).style("fill", fillOf);
+        on(circ).attr("r", function (d) { return mode === "aiuti" ? rScale(d.assegni) : 0; });
+        marOutline.style("opacity", mode === "richieste" ? 1 : 0);
+        svg.attr("aria-label", mode === "aiuti"
+          ? "Mappa delle regioni: il fondo 2026 per il reddito di libertà paga " + f0(d3.sum(ok, function (d) { return d.assegni; })) +
+            " assegni pieni, dai " + f0(maxAss) + " della Lombardia ai " + f0(d3.min(ok, function (d) { return d.assegni; })) +
+            " della Valle d'Aosta. Ogni regione riceve " + f2(perDonna) + " euro per donna residente tra 18 e 67 anni. Nelle Marche " +
+            f0(mar.assegni) + " assegni per " + f0(MARCHE.domande) + " domande."
+          : "Mappa delle regioni: le vittime che hanno chiamato il 1522 nel 2024 vanno da " + f0(low.rate) + " ogni 100mila donne in " +
+            low.name + " a " + f0(high.rate) + " nel " + high.name + "; media italiana " + f0(itRate) + ", Marche " + f0(mar.rate) + ".");
+        drawAnno();
+      }
+
+      // ---- annotazioni: a destra su desktop, in testo sotto la mappa su mobile ----
+      var an = g.append("g").attr("class", "anno");
+      d3.select(host).selectAll(".r-anno-m").remove();
+      var annoM = narrow ? d3.select(host).append("p").attr("class", "r-anno-m") : null;
+      function drawAnno() {
+        an.selectAll("*").remove();
+        var items = mode === "aiuti"
+          ? [{ d: mar, b: f0(mar.assegni) + " assegni pagabili nelle Marche,", t: " a fronte di " + f0(MARCHE.domande) + " domande: " + f0(MARCHE.domande - mar.assegni) + " sono rimaste senza fondi" }]
+          : [{ d: mar, b: "Marche: " + f0(mar.rate), t: " chiamate ogni 100mila donne, in linea con la media italiana (" + f0(itRate) + ")" },
+             { d: low, b: low.name + ": " + f0(low.rate) + ",", t: " il valore più basso, poco più della metà della media" }];
+        if (narrow) {
+          annoM.html(items.map(function (it) { return "<b>" + it.b + "</b>" + it.t; }).join("<br>"));
+          return;
+        }
+        items.forEach(function (it) {
+          var ty = it.d.cy;
+          var text = an.append("text").attr("x", annoX).attr("y", ty).attr("dy", "0.35em").text(it.b + it.t);
+          text.call(R.wrap, annoW);
+          var n = +text.attr("data-lines") || 1;
+          text.attr("transform", "translate(0," + (-(n - 1) * 17.5 / 2) + ")");
+          var x0 = it.d.cx + (mode === "aiuti" && it.d.assegni ? rScale(it.d.assegni) + 3 : 0);
+          an.append("path").attr("d", "M" + x0 + "," + it.d.cy + "H" + (annoX - 8));
+          an.append("circle").attr("cx", x0).attr("cy", it.d.cy).attr("r", 1.75);
+        });
+      }
+
+      redraw = function (animate) { paint(animate); };
+      shapes.style("fill", fillOf);
+      paint(false);
+      if (phase === "pre") { circ.attr("r", 0); an.style("opacity", 0); }
+      if (phase === "play") {
+        if (mode === "aiuti") circ.attr("r", 0).transition().duration(R.DUR).ease(R.EASE).attr("r", function (d) { return rScale(d.assegni); });
+        an.style("opacity", 0).transition().delay(R.DUR * 0.7).style("opacity", 1);
+      }
+
+      // ---- interazione: cursore o tocco sulla regione ----
+      clear = function () { hover.attr("d", null); shapes.classed("is-dimmed", false); };
+      shapes.style("cursor", "pointer")
+        .on("pointerenter pointermove pointerdown", function (ev, d) {
+          hover.attr("d", path(d.f));
+          var o;
+          if (d.na) {
+            o = { title: d.name, value: null, rows: [["Vittime al 1522 (2024)", f0(d.calls)]], note: "Ha una propria misura analoga e non partecipa al riparto del fondo" };
+          } else {
+            o = mode === "aiuti"
+              ? { title: d.name, value: f0(d.assegni), unit: "assegni pieni",
+                  rows: [["Budget 2026", fmt(d.budget, 0) + " €"], ["Euro per donna", f2(d.budget / d.pop)], ["Vittime al 1522 ogni 100mila donne", f0(d.rate)]] }
+              : { title: d.name, value: f0(d.rate), unit: "ogni 100mila donne",
+                  rows: [["Vittime al 1522 (2024)", f0(d.calls)], ["Assegni pieni 2026", f0(d.assegni)], ["Budget 2026", fmt(d.budget, 0) + " €"]] };
+            if (d === mar) o.note = "Nel 2026: " + f0(MARCHE.domande) + " domande, " + f0(MARCHE.accolte) + " finanziate";
+          }
+          var pt = d3.pointer(ev, host);
+          tip.show(R.tipHTML(o), pt[0], pt[1]);
+        })
+        .on("pointerleave", function (ev) { if (ev.pointerType === "mouse") { tip.hide(); clear(); } });
+    });
+  }).catch(function (e) { R.fail("#mappa", e); });
+})();
+</script>
+</body>
+</html>

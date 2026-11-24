@@ -1,0 +1,207 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Retribuzioni di uomini e donne per inquadramento – Radar QN</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Libre+Franklin:wght@400;500;600;700&family=Newsreader:opsz,wght@6..72,400;6..72,700&display=swap">
+<link rel="stylesheet" href="../assets/radar.css">
+<script src="https://cdn.jsdelivr.net/npm/d3@7"></script>
+<script src="../assets/radar.js"></script>
+<style>
+  .row-label { font-size: 13px; font-weight: 600; fill: var(--ink); }
+  .col-head { font-size: 12px; fill: var(--ink-2); }
+  .gap-pct { font-size: 13px; font-weight: 700; }
+  .gap-date { font-size: 13px; font-weight: 500; fill: var(--ink); }
+  .panel-label { font-size: 12px; fill: var(--ink-2); }
+</style>
+</head>
+<body>
+<main class="radar">
+  <header>
+    <h1 class="r-title">Anche nello stesso ruolo, le donne guadagnano meno</h1>
+    <p class="r-sub">Retribuzione media annua lorda nel settore privato, per categoria contrattuale</p>
+  </header>
+
+  <div class="r-big" id="big" aria-hidden="true">
+    <span><span class="r-big__num" id="big-num">&nbsp;</span> <span class="r-big__unit" id="big-unit"></span></span>
+    <span class="r-big__label" id="big-label"></span>
+  </div>
+
+  <figure class="r-chart" id="dumb">
+    <div class="r-key" id="key" style="margin:0 0 8px"></div>
+  </figure>
+
+  <footer class="r-foot">
+    <span>Fonte: ODM Consulting (Gi Group Holding), Rapporto retribuzioni 2026</span>
+    <span>Elaborazione Radar – QN</span>
+  </footer>
+</main>
+
+<script>
+(function () {
+  var R = Radar, fmt = R.fmt;
+  var RDL_MESE = 530;   // reddito di libertà, euro al mese
+  var MESI = R.timeLocale.format("%B");
+
+  R.loadCSV("../data/retribuzioni-inquadramento.csv").then(function (rows) {
+    var data = rows.map(function (r) {
+      var u = R.num(r["Uomini"]), d = R.num(r["Donne"]);
+      var gap = (u - d) / u;
+      var unpaid = Math.round(gap * 365);              // giorni dell'anno "non pagati"
+      var date = new Date(2026, 0, 1 + 365 - unpaid);  // primo giorno "gratis"
+      return { k: r["Inquadramento"], u: u, d: d, diff: u - d, gap: gap, unpaid: unpaid, date: date };
+    });
+    var media = data.find(function (d) { return d.k === "Media"; });
+    var cats = data.filter(function (d) { return d !== media; });
+    var top = data.filter(function (d) { return d.k !== "Dirigenti"; });       // pannello 1
+    var dir = data.find(function (d) { return d.k === "Dirigenti"; });          // pannello 2
+    var maxGap = cats.reduce(function (a, b) { return b.gap > a.gap ? b : a; });
+    var dayFmt = function (dt) { return dt.getDate() + " " + MESI(dt); };
+    var f0 = function (v) { return fmt(v, 0); };
+    var p1 = function (g) { return "−" + fmt(g * 100, 1) + "%"; };
+
+    // ---- Big number ----
+    var bigNum = d3.select("#big-num");
+    d3.select("#big-unit").text(MESI(media.date));
+    d3.select("#big-label").text("In media una donna guadagna il " + fmt(media.gap * 100, 1) +
+      "% meno di un uomo: è come se dal " + dayFmt(media.date) + " a fine anno lavorasse gratis");
+    if (R.reduced) bigNum.text(media.date.getDate());
+    else { bigNum.text("1"); R.onFirstView(document.getElementById("big"), function () { R.countUp(bigNum, media.date.getDate(), f0, "play"); }); }
+    d3.select("#key").html('<span><i class="sw" style="background:var(--grey);border-radius:50%"></i>Uomini</span>' +
+      '<span><i class="sw" style="background:var(--blue);border-radius:50%"></i>Donne</span>');
+
+    var host = document.getElementById("dumb");
+    var tip = R.tooltip(host);
+    var clear = function () {};
+    R.dismissOutside(host, function () { tip.hide(); clear(); });
+
+    R.responsive(host, function (W, phase) {
+      var narrow = R.isNarrow(W);
+      var labW = narrow ? 78 : 96;
+      var rightW = narrow ? 92 : 190;
+      var plotW = W - labW - rightW - (narrow ? 8 : 16);
+      // stessa scala in euro nei due pannelli: il pannello dei dirigenti è largo in proporzione
+      var d1 = [20000, 70000], d2 = [105000, 130000];
+      var eur = plotW / (d1[1] - d1[0]);
+      var x1 = d3.scaleLinear().domain(d1).range([0, plotW]);
+      var x2 = d3.scaleLinear().domain(d2).range([0, (d2[1] - d2[0]) * eur]);
+      var row = narrow ? 50 : 44, headH = narrow ? 56 : 42, axisH = 22, panelGap = 40;
+      var extra = narrow ? 0 : 36;   // spazio per l'annotazione sotto la riga col divario maggiore
+      var iMax = top.indexOf(maxGap);
+      var y1 = function (i) { return headH + i * row + row / 2 + (i > iMax ? extra : 0); };
+      var topH = top.length * row + extra;
+      var p2Top = headH + topH + axisH + panelGap;
+      var y2 = p2Top + row / 2;
+      var H = p2Top + row + axisH + 6;
+
+      d3.select(host).select("svg").remove();
+      var svg = d3.select(host).insert("svg", ".r-tip").attr("width", W).attr("height", H).attr("role", "img")
+        .attr("aria-label", "Grafico a manubri: retribuzione media annua di uomini e donne per categoria. Il divario è del " +
+          cats.map(function (d) { return fmt(d.gap * 100, 1) + "% tra i " + d.k.toLowerCase(); }).join(", ") +
+          ". In media " + fmt(media.gap * 100, 1) + "%: è come se una donna lavorasse gratis dal " + dayFmt(media.date) + ".");
+      svg.append("title").text("Retribuzioni medie annue di uomini e donne per inquadramento");
+      var g = svg.append("g").attr("transform", "translate(" + labW + ",0)");
+      var rx = plotW + (narrow ? 8 : 16);   // colonna di destra
+
+      // intestazioni della colonna di destra
+      var dateX = narrow ? rx : rx + 64;
+      if (!narrow) g.append("text").attr("class", "col-head").attr("x", rx).attr("y", headH - 14).text("Divario");
+      var ch = g.append("text").attr("class", "col-head").attr("x", dateX).attr("y", headH - (narrow ? 42 : 28));
+      (narrow ? ["È come se", "lavorasse", "gratis dal"] : ["È come se lavorasse", "gratis dal"]).forEach(function (t, i) {
+        ch.append("tspan").attr("x", dateX).attr("dy", i ? 14 : 0).text(t);
+      });
+
+      function axis(sel, x, yPos, step) {
+        var ticks = d3.range(Math.ceil(x.domain()[0] / step) * step, x.domain()[1] + 1, step);
+        sel.append("g").attr("class", "grid").selectAll("line").data(ticks).join("line")
+          .attr("x1", function (t) { return Math.round(x(t)) + 0.5; }).attr("x2", function (t) { return Math.round(x(t)) + 0.5; })
+          .attr("y1", yPos[0]).attr("y2", yPos[1]);
+        sel.append("g").selectAll("text").data(ticks).join("text").attr("class", "tick-label").attr("text-anchor", "middle")
+          .attr("x", function (t) { return x(t); }).attr("y", yPos[1] + 15)
+          .text(function (t) { return fmt(t / 1000, 0) + (t === ticks[ticks.length - 1] ? " mila €" : ""); });
+      }
+      axis(g, x1, [headH - 4, headH + topH], narrow ? 25000 : 10000);
+      axis(g, x2, [p2Top - 4, p2Top + row], narrow ? 20000 : 10000);
+      g.append("text").attr("class", "panel-label").attr("x", 0).attr("y", p2Top - 14).text("Dirigenti, stessa scala");
+
+      var items = top.map(function (d, i) { return { d: d, x: x1, y: y1(i) }; }).concat([{ d: dir, x: x2, y: y2 }]);
+      var rowsG = g.append("g").selectAll("g").data(items).join("g").attr("class", "mark");
+      rowsG.append("text").attr("class", "row-label").attr("x", -labW).attr("y", function (it) { return it.y; }).attr("dy", "0.35em")
+        .style("font-weight", function (it) { return it.d === media ? 700 : 600; })
+        .text(function (it) { return it.d === media ? "Media" : it.d.k; });
+      var isMax = function (it) { return it.d === maxGap; };
+      var seg = rowsG.append("line").attr("y1", function (it) { return it.y; }).attr("y2", function (it) { return it.y; })
+        .style("stroke", function (it) { return isMax(it) ? "var(--red)" : "var(--grey-light)"; }).style("stroke-width", 3);
+      var dotU = rowsG.append("circle").attr("r", 6).attr("cy", function (it) { return it.y; }).style("fill", "var(--grey)");
+      var dotD = rowsG.append("circle").attr("r", 6).attr("cy", function (it) { return it.y; })
+        .style("fill", function (it) { return isMax(it) ? "var(--red)" : "var(--blue)"; });
+      // valori sopra i pallini (solo desktop)
+      var vU = rowsG.append("text").attr("class", "val-label val-label--muted").attr("text-anchor", "start")
+        .attr("y", function (it) { return it.y - 11; }).attr("x", function (it) { return it.x(it.d.u) - 6; })
+        .text(function (it) { return narrow ? "" : fmt(it.d.u, 0); });
+      var vD = rowsG.append("text").attr("class", "val-label").attr("text-anchor", "end")
+        .attr("y", function (it) { return it.y - 11; }).attr("x", function (it) { return it.x(it.d.d) + 6; })
+        .text(function (it) { return narrow ? "" : fmt(it.d.d, 0); });
+      // colonna di destra: divario e data
+      var right = rowsG.append("text").attr("x", rx).attr("y", function (it) { return it.y; }).attr("dy", "0.35em");
+      right.append("tspan").attr("class", "gap-pct").style("fill", function (it) { return isMax(it) ? "var(--red)" : "var(--ink)"; })
+        .text(function (it) { return p1(it.d.gap); });
+      if (narrow) {
+        right.append("tspan").attr("class", "gap-date").attr("x", rx).attr("dy", 16)
+          .style("fill", function (it) { return isMax(it) ? "var(--red)" : null; }).text(function (it) { return dayFmt(it.d.date); });
+      } else {
+        right.append("tspan").attr("class", "gap-date").attr("x", dateX)
+          .style("fill", function (it) { return isMax(it) ? "var(--red)" : null; }).text(function (it) { return dayFmt(it.d.date); });
+      }
+
+      R.enter(seg, phase,
+        function (s) { s.attr("x1", function (it) { return it.x(it.d.u); }).attr("x2", function (it) { return it.x(it.d.u); }); },
+        function (s) { s.attr("x1", function (it) { return it.x(it.d.u); }).attr("x2", function (it) { return it.x(it.d.d); }); });
+      dotU.attr("cx", function (it) { return it.x(it.d.u); });
+      R.enter(dotD, phase,
+        function (s) { s.attr("cx", function (it) { return it.x(it.d.u); }); },
+        function (s) { s.attr("cx", function (it) { return it.x(it.d.d); }); });
+      var later = [vU, vD, right];
+      later.forEach(function (sel) { R.enter(sel, phase, function (s) { s.style("opacity", 0); }, function (s) { s.style("opacity", 1); }, R.DUR * 0.6); });
+
+      // annotazione (una): la riga col divario maggiore, collegata al reddito di libertà
+      var mi = items.find(isMax);
+      var mesi = maxGap.diff / RDL_MESE;
+      var an = g.append("g").attr("class", "anno");
+      var annoTxt = fmt(maxGap.diff, 0) + " euro l'anno in meno per un'operaia: più di " +
+        (Math.floor(mesi) === 7 ? "sette" : f0(Math.floor(mesi))) + " mesi di reddito di libertà";
+      d3.select(host).selectAll(".r-anno-m").remove();
+      if (narrow) {
+        d3.select(host).append("p").attr("class", "r-note r-anno-m").style("color", "var(--ink)").style("font-size", "13px")
+          .text(annoTxt);
+      } else {
+        var ax = mi.x(maxGap.d);
+        var at = an.append("text").attr("x", ax).attr("y", mi.y + 24).text(annoTxt);
+        at.call(R.wrap, plotW - ax - 12);
+      }
+      R.enter(an, phase, function (s) { s.style("opacity", 0); }, function (s) { s.style("opacity", 1); }, R.DUR * 0.8);
+
+      // interazione
+      clear = function () { rowsG.classed("is-dimmed", false); };
+      g.append("g").selectAll("rect").data(items).join("rect").attr("class", "hit")
+        .attr("x", -labW).attr("width", W).attr("y", function (it) { return it.y - row / 2; }).attr("height", row)
+        .on("pointerenter pointerdown", function (ev, it) {
+          rowsG.classed("is-dimmed", function (q) { return q !== it; });
+          var d = it.d;
+          tip.show(R.tipHTML({
+            title: d === media ? "Media di tutte le categorie" : d.k,
+            value: p1(d.gap), unit: "di divario",
+            rows: [["Uomini", fmt(d.u, 0) + " €"], ["Donne", fmt(d.d, 0) + " €"], ["Differenza", fmt(d.diff, 0) + " €"], ["Come se lavorasse gratis dal", dayFmt(d.date)]],
+            note: "La differenza equivale a " + fmt(d.diff / RDL_MESE, 1) + " mesi di reddito di libertà"
+          }), labW + it.x(d.d), it.y);
+        })
+        .on("pointerleave", function (ev) { if (ev.pointerType === "mouse") { tip.hide(); clear(); } });
+    });
+  }).catch(function (e) { R.fail("#dumb", e); });
+})();
+</script>
+</body>
+</html>
