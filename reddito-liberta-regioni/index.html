@@ -33,7 +33,7 @@
 <main class="radar">
   <header>
     <h1 class="r-title"><span>Reddito di libertà,</span><span>come è diviso il fondo 2026</span></h1>
-    <p class="r-sub">Gli assegni che ogni regione può pagare e le richieste di aiuto arrivate al 1522</p>
+    <p class="r-sub">Gli assegni che ogni regione può pagare e le vittime di violenza che hanno chiamato il 1522</p>
   </header>
 
   <div class="r-big" id="big" aria-hidden="true">
@@ -43,7 +43,7 @@
 
   <div class="r-switch" role="group" aria-label="Scegli la vista">
     <button type="button" data-mode="aiuti" aria-pressed="true">Aiuti</button>
-    <button type="button" data-mode="richieste" aria-pressed="false">Richieste di aiuto</button>
+    <button type="button" data-mode="richieste" aria-pressed="false">Chiamate al 1522</button>
   </div>
 
   <figure class="r-chart" id="mappa">
@@ -54,7 +54,7 @@
   <p class="r-note" id="note"></p>
 
   <footer class="r-foot">
-    <span>Fonte: Dipartimento per le Pari opportunità, Inps (messaggio 3110/2026), Istat, Il Resto del Carlino</span>
+    <span id="fonte">Fonte: Dipartimento per le Pari opportunità, Inps (messaggio 3110/2026), Istat, Il Resto del Carlino</span>
     <span>Elaborazione Radar – QN</span>
   </footer>
 </main>
@@ -67,10 +67,10 @@
   var NUDGE = { "Liguria": [4, -6], "Campania": [-4, 4], "Lombardia": [0, -2] };
   // domande 2026 nelle Marche (Il Resto del Carlino, 22 novembre 2026)
   var MARCHE = { domande: 142, accolte: 80 };
-  // classi delle chiamate al 1522 ogni 100mila donne
-  var BREAKS = [55, 70, 85, 100];
+  // classi delle vittime che hanno chiamato il 1522 ogni 100mila donne residenti
+  var BREAKS = [35, 45, 55, 65];
   var CLASS_FILL = ["var(--blue-5)", "var(--blue-4)", "var(--blue-3)", "var(--blue-2)", "var(--blue-1)"];
-  var CLASS_LABEL = ["meno di 55", "55–70", "70–85", "85–100", "100 e oltre"];
+  var CLASS_LABEL = ["meno di 35", "35–45", "45–55", "55–65", "65 e oltre"];
 
   Promise.all([R.loadCSV("../data/rdl-regioni.csv"), fetch("../data/regioni-italia.geojson").then(function (r) { return r.json(); })]).then(function (res) {
     var rows = res[0], geo = res[1];
@@ -83,24 +83,27 @@
       var pop = R.num(r["Donne 18-67 anni"]);
       var budget = pop == null ? null :
         R.num(r["Quota 10 milioni"]) + R.num(r["Quota 1 milione"]) + R.num(r["Quota 5,5 milioni"]) + R.num(r["Quota straordinaria 3,9 milioni"]);
-      var calls = R.num(r["Richieste di aiuto al 1522 (2024)"]);
+      var calls = R.num(r["Vittime che hanno chiamato il 1522 (2024)"]);
+      // denominatore del tasso: tutte le donne residenti al 1° gennaio 2025 (Trentino-Alto Adige compreso)
+      var res = R.num(r["Donne residenti (1° gennaio 2025)"]);
       return {
         name: r["Regione"], f: byName[r["Regione"]], pop: pop, budget: budget,
         assegni: budget == null ? null : Math.floor(budget / ASSEGNO),
-        calls: calls, rate: pop == null ? null : calls / pop * 1e5, na: pop == null
+        calls: calls, res: res, rate: calls / res * 1e5, na: pop == null
       };
     });
     var ok = reg.filter(function (d) { return !d.na; });
     var totBudget = d3.sum(ok, function (d) { return d.budget; });
     var totPop = d3.sum(ok, function (d) { return d.pop; });
     var perDonna = totBudget / totPop;
-    var itRate = d3.sum(ok, function (d) { return d.calls; }) / totPop * 1e5;
+    // media italiana: vittime con regione di provenienza nota / donne residenti in Italia
+    var itRate = d3.sum(reg, function (d) { return d.calls; }) / d3.sum(reg, function (d) { return d.res; }) * 1e5;
     var mar = reg.find(function (d) { return d.name === "Marche"; });
-    var low = ok.reduce(function (a, b) { return b.rate < a.rate ? b : a; });
-    var high = ok.reduce(function (a, b) { return b.rate > a.rate ? b : a; });
+    var low = reg.reduce(function (a, b) { return b.rate < a.rate ? b : a; });
+    var high = reg.reduce(function (a, b) { return b.rate > a.rate ? b : a; });
     var maxAss = d3.max(ok, function (d) { return d.assegni; });
     var cls = function (v) { return d3.bisectRight(BREAKS, v); };
-    var f0 = function (v) { return fmt(v, 0); }, f2 = function (v) { return fmt(v, 2); };
+    var f0 = function (v) { return fmt(v, 0); }, f1 = function (v) { return fmt(v, 1); }, f2 = function (v) { return fmt(v, 2); };
     var mln = function (v) { return fmt(v / 1e6, 1) + " milioni"; };
 
     // ---- Big number ----
@@ -116,8 +119,8 @@
         sub: "Cerchi proporzionali al numero di assegni da " + f0(ASSEGNO) + " euro (530 euro al mese per un anno)"
       },
       richieste: {
-        head: "Richieste di aiuto al 1522 nel 2024",
-        sub: "Ogni 100mila donne tra 18 e 67 anni. Media italiana: " + f0(itRate)
+        head: "Vittime che hanno chiamato il 1522 nel 2024, ogni 100mila donne residenti",
+        sub: "Per regione di provenienza. Media italiana: " + f1(itRate)
       }
     };
     var mode = "aiuti";
@@ -132,8 +135,7 @@
         return '<span><i class="sw sw--dot"></i>Assegni pagabili</span>' +
           '<span><i class="sw sw--na"></i>Non partecipa al riparto</span>';
       }
-      return CLASS_LABEL.map(function (l, i) { return '<span><i class="sw" style="background:' + CLASS_FILL[i] + '"></i>' + l + "</span>"; }).join("") +
-        '<span><i class="sw sw--na"></i>Non calcolato</span>';
+      return CLASS_LABEL.map(function (l, i) { return '<span><i class="sw" style="background:' + CLASS_FILL[i] + '"></i>' + l + "</span>"; }).join("");
     }
     function setTexts() {
       d3.select("#map-head").text(TEXT[mode].head);
@@ -141,7 +143,10 @@
       d3.select("#key").html(keyHTML());
       d3.select("#note").text(mode === "aiuti"
         ? "Il budget 2026 somma le quote statali (16,5 milioni) e lo stanziamento straordinario di ottobre (3,9 milioni). La quota di 5,5 milioni della legge di Bilancio 2026 è ripartita con lo stesso criterio delle altre, la popolazione femminile tra 18 e 67 anni. Il Trentino-Alto Adige ha una propria misura analoga e non partecipa al riparto."
-        : "Chiamate al 1522 per chiedere aiuto o segnalare una violenza, per regione di provenienza. Per il Trentino-Alto Adige il tasso non è calcolato: " + f0(reg.find(function (d) { return d.na; }).calls) + " chiamate nel 2024.");
+        : "Chiamate di vittime di violenza al 1522 nel 2024 per regione di provenienza, somma dei quattro trimestri. Il tasso è calcolato su tutte le donne residenti al 1° gennaio 2025");
+      d3.select("#fonte").text(mode === "aiuti"
+        ? "Fonte: Dipartimento per le Pari opportunità, Inps (messaggio 3110/2026), Istat, Il Resto del Carlino"
+        : "Fonte: Istat-Dipartimento per le pari opportunità, Il numero verde 1522, tavola 7; Istat, popolazione al 1° gennaio 2025");
     }
     d3.selectAll(".r-switch button").on("click", function () {
       var m = this.getAttribute("data-mode");
@@ -190,7 +195,7 @@
         .style("fill-opacity", 0.85).style("stroke", "var(--bg)").style("stroke-width", 1);
 
       function fillOf(d) {
-        if (d.na) return "url(#hatch)";
+        if (mode === "aiuti" && d.na) return "url(#hatch)";
         return mode === "aiuti" ? "var(--grey-5)" : CLASS_FILL[cls(d.rate)];
       }
       function paint(animate) {
@@ -204,8 +209,8 @@
             " assegni pieni, dai " + f0(maxAss) + " della Lombardia ai " + f0(d3.min(ok, function (d) { return d.assegni; })) +
             " della Valle d'Aosta. Ogni regione riceve " + f2(perDonna) + " euro per donna residente tra 18 e 67 anni. Nelle Marche " +
             f0(mar.assegni) + " assegni per " + f0(MARCHE.domande) + " domande."
-          : "Mappa delle regioni: le richieste di aiuto al 1522 nel 2024 vanno da " + f0(low.rate) + " ogni 100mila donne in " +
-            low.name + " a " + f0(high.rate) + " nel " + high.name + "; media italiana " + f0(itRate) + ", Marche " + f0(mar.rate) + ".");
+          : "Mappa delle regioni: le vittime che hanno chiamato il 1522 nel 2024 vanno da " + f1(low.rate) + " ogni 100mila donne residenti in " +
+            low.name + " a " + f1(high.rate) + " nel " + high.name + "; media italiana " + f1(itRate) + ", Marche " + f1(mar.rate) + ".");
         drawAnno();
       }
 
@@ -217,8 +222,8 @@
         an.selectAll("*").remove();
         var items = mode === "aiuti"
           ? [{ d: mar, b: f0(mar.assegni) + " assegni pagabili nelle Marche,", t: " a fronte di " + f0(MARCHE.domande) + " domande: " + f0(MARCHE.domande - mar.assegni) + " sono rimaste senza fondi" }]
-          : [{ d: mar, b: "Marche: " + f0(mar.rate), t: " richieste di aiuto ogni 100mila donne, in linea con la media italiana (" + f0(itRate) + ")" },
-             { d: low, b: low.name + ": " + f0(low.rate) + ",", t: " il valore più basso, poco più della metà della media" }];
+          : [{ d: mar, b: "Marche: " + f1(mar.rate), t: " vittime che hanno chiamato il 1522 ogni 100mila donne residenti, in linea con la media italiana (" + f1(itRate) + ")" },
+             { d: low, b: low.name + ": " + f1(low.rate) + ",", t: " il valore più basso, poco più della metà della media" }];
         if (narrow) {
           annoM.html(items.map(function (it) { return "<b>" + it.b + "</b>" + it.t; }).join("<br>"));
           return;
@@ -250,14 +255,18 @@
         .on("pointerenter pointermove pointerdown", function (ev, d) {
           hover.attr("d", path(d.f));
           var o;
-          if (d.na) {
-            o = { title: d.name, value: null, rows: [["Richieste di aiuto al 1522 (2024)", f0(d.calls)]], note: "Ha una propria misura analoga e non partecipa al riparto del fondo" };
+          if (d.na && mode === "aiuti") {
+            o = { title: d.name, value: null, rows: [["Vittime al 1522 ogni 100mila donne", f1(d.rate)], ["Vittime che hanno chiamato il 1522 (2024)", f0(d.calls)]], note: "Ha una propria misura analoga e non partecipa al riparto del fondo" };
+          } else if (d.na) {
+            o = { title: d.name, value: f1(d.rate), unit: "vittime ogni 100mila donne",
+                  rows: [["Vittime che hanno chiamato il 1522 (2024)", f0(d.calls)], ["Donne residenti", f0(d.res)]],
+                  note: "Non partecipa al riparto del fondo: ha una propria misura analoga" };
           } else {
             o = mode === "aiuti"
               ? { title: d.name, value: f0(d.assegni), unit: "assegni pieni",
-                  rows: [["Budget 2026", fmt(d.budget, 0) + " €"], ["Euro per donna", f2(d.budget / d.pop)], ["Richieste al 1522 ogni 100mila donne", f0(d.rate)]] }
-              : { title: d.name, value: f0(d.rate), unit: "ogni 100mila donne",
-                  rows: [["Richieste di aiuto al 1522 (2024)", f0(d.calls)], ["Assegni pieni 2026", f0(d.assegni)], ["Budget 2026", fmt(d.budget, 0) + " €"]] };
+                  rows: [["Budget 2026", fmt(d.budget, 0) + " €"], ["Euro per donna", f2(d.budget / d.pop)], ["Vittime al 1522 ogni 100mila donne", f1(d.rate)]] }
+              : { title: d.name, value: f1(d.rate), unit: "vittime ogni 100mila donne",
+                  rows: [["Vittime che hanno chiamato il 1522 (2024)", f0(d.calls)], ["Donne residenti", f0(d.res)], ["Assegni pieni 2026", f0(d.assegni)], ["Budget 2026", fmt(d.budget, 0) + " €"]] };
             if (d === mar) o.note = "Nel 2026: " + f0(MARCHE.domande) + " domande, " + f0(MARCHE.accolte) + " finanziate";
           }
           var pt = d3.pointer(ev, host);

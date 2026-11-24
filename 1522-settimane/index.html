@@ -15,7 +15,7 @@
 <main class="radar">
   <header>
     <h1 class="r-title">Ogni 25 novembre il 1522 squilla di più</h1>
-    <p class="r-sub">Chiamate al numero antiviolenza e antistalking 1522 per chiedere aiuto o segnalare una violenza, settimana per settimana</p>
+    <p class="r-sub">Chiamate valide al numero antiviolenza e antistalking 1522, settimana per settimana (da lunedì a domenica), 2018-2025</p>
   </header>
 
   <div class="r-big" id="big" aria-hidden="true">
@@ -25,10 +25,10 @@
 
   <figure class="r-chart" id="linea"></figure>
   <div class="r-key" id="key"></div>
-  <p class="r-note">Dati settimanali disponibili fino a settembre 2024. Dal 2025 il 1522 registra le chiamate in modo diverso, e i numeri non sono confrontabili con gli anni precedenti.</p>
 
   <footer class="r-foot">
-    <span>Fonte: Istat su dati del Dipartimento per le Pari opportunità</span>
+    <span style="flex-basis:100%">Da aprile 2025 il servizio ha un nuovo gestore: i dati del 2025 non sono del tutto confrontabili con quelli degli anni precedenti</span>
+    <span>Fonte: Istat-Dipartimento per le pari opportunità, Il numero verde 1522, tavola 5</span>
     <span>Elaborazione Radar – QN</span>
   </footer>
 </main>
@@ -41,32 +41,32 @@
 
   R.loadCSV("../data/1522-settimanale.csv").then(function (rows) {
     var data = rows.map(function (r) {
-      var s = parseD(r["Inizio settimana"]), e = parseD(r["Fine settimana"]);
+      // la data è il lunedì: la settimana va da lunedì a domenica (lunedì + 6 giorni)
+      var s = parseD(r["Settimana (lunedì)"]), e = d3.timeDay.offset(s, 6);
       var y = s.getFullYear(), nov25 = new Date(y, 10, 25);
-      return { s: s, e: e, mid: d3.timeDay.offset(s, 3), v: R.num(r["Richieste di aiuto al 1522"]), y: y, is25: s <= nov25 && nov25 <= e,
-        ok: r["Dati completi"] === "Sì" };
+      return { s: s, e: e, mid: d3.timeDay.offset(s, 3), v: R.num(r["Chiamate"]), y: y, is25: s <= nov25 && nov25 <= e };
     });
     var years = d3.groups(data, function (d) { return d.y; });
-    // per ogni anno completo: la settimana del 25 novembre rispetto alla settimana media dell'anno
+    // per ogni anno: la settimana del 25 novembre rispetto alla settimana media dell'anno
     var ratios = years.map(function (g) {
       var k = g[1].find(function (d) { return d.is25; });
-      return k ? k.v / d3.mean(g[1].filter(function (d) { return d.ok; }), function (d) { return d.v; }) : null;
+      return k ? k.v / d3.mean(g[1], function (d) { return d.v; }) : null;
     }).filter(function (x) { return x != null; });
     var avgRatio = d3.mean(ratios);
     var y0 = d3.min(years, function (g) { return g[0]; });
     var lastFull = d3.max(data.filter(function (d) { return d.is25; }), function (d) { return d.y; });
+    var y1 = d3.max(years, function (g) { return g[0]; });
     var max = data.reduce(function (a, b) { return b.v > a.v ? b : a; });
     var nov25 = data.filter(function (d) { return d.is25; });
 
     // ---- Big number ----
     var bigNum = d3.select("#big-num"), fp = function (v) { return "+" + fmt(v, 0); };
-    d3.select("#big-label").text("in media, nella settimana del 25 novembre, le richieste di aiuto al 1522 rispetto a una settimana qualsiasi dello stesso anno (" + y0 + "-" + lastFull + ")");
+    d3.select("#big-label").text("in media, nella settimana del 25 novembre, le chiamate valide al 1522 rispetto a una settimana qualsiasi dello stesso anno (" + y0 + "-" + lastFull + ")");
     var big = (avgRatio - 1) * 100;
     if (R.reduced) bigNum.text(fp(big));
     else { bigNum.text(fp(0)); R.onFirstView(document.getElementById("big"), function () { R.countUp(bigNum, big, fp, "play"); }); }
-    d3.select("#key").html('<span><i class="sw" style="background:var(--blue);height:2px;border-radius:0"></i>Richieste di aiuto per settimana</span>' +
-      '<span><i class="sw" style="background:var(--red);border-radius:50%"></i>Settimana del 25 novembre</span>' +
-      '<span><i class="sw" style="background:none;border-top:2px dashed var(--grey);height:0;border-radius:0"></i>Dati incompleti (inizio 2023)</span>');
+    d3.select("#key").html('<span><i class="sw" style="background:var(--blue);height:2px;border-radius:0"></i>Chiamate valide per settimana</span>' +
+      '<span><i class="sw" style="background:var(--red);border-radius:50%"></i>Settimana del 25 novembre</span>');
 
     // annotazioni: lockdown 2020 e novembre 2023
     var lock = data.filter(function (d) { return d.y === 2020 && d.s.getMonth() >= 2 && d.s.getMonth() <= 4; })
@@ -89,9 +89,9 @@
 
       d3.select(host).select("svg").remove();
       var svg = d3.select(host).insert("svg", ".r-tip").attr("width", W).attr("height", H).attr("role", "img")
-        .attr("aria-label", "Grafico a linea: le richieste di aiuto al 1522 ogni settimana dal " + y0 + " a settembre 2024. Ogni anno la settimana del 25 novembre è tra le più alte: in media il " +
-          fmt(big, 0) + "% in più di una settimana qualsiasi. Il massimo è " + fmt(max.v, 0) + " richieste di aiuto nella settimana dal " + dFull(max.s) + ".");
-      svg.append("title").text("Richieste di aiuto al 1522 per settimana");
+        .attr("aria-label", "Grafico a linea: le chiamate valide al 1522 ogni settimana dal " + y0 + " al " + y1 + ". Ogni anno la settimana del 25 novembre è tra le più alte: in media il " +
+          fmt(big, 0) + "% in più di una settimana qualsiasi. Il massimo è " + fmt(max.v, 0) + " chiamate valide nella settimana dal " + dFull(max.s) + ".");
+      svg.append("title").text("Chiamate valide al 1522 per settimana");
       var g = svg.append("g").attr("transform", "translate(" + m.left + "," + m.top + ")");
 
       var ticks = y.ticks(narrow ? 3 : 4);
@@ -101,17 +101,12 @@
         .attr("class", function (d) { return d === 0 ? "baseline" : null; });
       g.append("g").selectAll("text").data(ticks).join("text").attr("class", "tick-label")
         .attr("x", -m.left).attr("y", function (d) { return y(d) - 5; }).text(function (d) { return fmt(d, 0); });
-      var yt = d3.range(y0, 2025).filter(function (yr) { return !narrow || yr % 2 === 1; });
+      var yt = d3.range(y0, y1 + 1).filter(function (yr) { return !narrow || yr % 2 === 1; });
       g.append("g").selectAll("text").data(yt).join("text").attr("class", "tick-label").attr("text-anchor", "middle")
         .attr("x", function (yr) { return x(new Date(yr, 6, 1)); }).attr("y", h + 18)
         .text(function (yr) { return narrow ? "’" + String(yr).slice(2) : yr; });
 
-      var line = d3.line().defined(function (d) { return d.ok; }).x(function (d) { return x(d.mid); }).y(function (d) { return y(d.v); }).curve(d3.curveMonotoneX);
-      // settimane con dati incompleti: tratteggio, a cavallo con le settimane complete vicine
-      var iBad = data.map(function (d, i) { return d.ok ? -1 : i; }).filter(function (i) { return i >= 0; });
-      var bad = data.slice(Math.max(0, iBad[0] - 1), iBad[iBad.length - 1] + 2);
-      g.append("path").datum(bad).attr("d", d3.line().x(function (d) { return x(d.mid); }).y(function (d) { return y(d.v); }))
-        .style("fill", "none").style("stroke", "var(--grey)").style("stroke-width", 1.2).style("stroke-dasharray", "3 3");
+      var line = d3.line().x(function (d) { return x(d.mid); }).y(function (d) { return y(d.v); }).curve(d3.curveMonotoneX);
       var path = g.append("path").datum(data).attr("class", "mark").attr("d", line)
         .style("fill", "none").style("stroke", "var(--blue)").style("stroke-width", narrow ? 1.1 : 1.3).style("stroke-linejoin", "round");
       var L = path.node().getTotalLength();
@@ -148,13 +143,12 @@
           var d = data[bis(data, x.invert(d3.pointer(ev)[0]))];
           ch.attr("x1", x(d.mid)).attr("x2", x(d.mid)).style("opacity", 1);
           hp.attr("cx", x(d.mid)).attr("cy", y(d.v)).style("opacity", 1).style("fill", d.is25 ? "var(--red)" : "var(--ink)");
-          var yrAvg = d3.mean(data.filter(function (q) { return q.y === d.y && q.ok; }), function (q) { return q.v; });
+          var yrAvg = d3.mean(data.filter(function (q) { return q.y === d.y; }), function (q) { return q.v; });
           tip.show(R.tipHTML({
             title: "Dal " + dDM(d.s).trim() + " al " + dFull(d.e).trim(),
-            value: fmt(d.v, 0), unit: "richieste di aiuto",
+            value: fmt(d.v, 0), unit: "chiamate valide",
             rows: [["Media settimanale " + d.y, fmt(yrAvg, 0)]],
-            note: !d.ok ? "Dati incompleti: in queste settimane gran parte delle chiamate non è attribuita a una provincia"
-              : d.is25 ? "Settimana del 25 novembre, Giornata internazionale contro la violenza sulle donne" : (d === max ? "Il valore più alto della serie" : null)
+            note: d.is25 ? "Settimana del 25 novembre, Giornata internazionale contro la violenza sulle donne" : (d === max ? "Il valore più alto della serie" : null)
           }), x(d.mid) + m.left, y(d.v) + m.top);
         })
         .on("pointerleave", function (ev) { if (ev.pointerType === "mouse") { tip.hide(); clear(); } });
