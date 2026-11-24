@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Reddito di libertà, fondi e richieste di aiuto per regione – Radar QN</title>
+<title>Reddito di libertà, come è diviso il fondo 2026 – Radar QN</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Libre+Franklin:wght@400;500;600;700&family=Newsreader:opsz,wght@6..72,400;6..72,700&display=swap">
@@ -32,8 +32,8 @@
 <body>
 <main class="radar">
   <header>
-    <h1 class="r-title"><span>Stessi soldi per ogni donna,</span><span>bisogni diversi</span></h1>
-    <p class="r-sub">Reddito di libertà 2026: come è diviso il fondo tra le regioni e quante richieste di aiuto arrivano al 1522</p>
+    <h1 class="r-title"><span>Reddito di libertà,</span><span>come è diviso il fondo 2026</span></h1>
+    <p class="r-sub">Gli assegni che ogni regione può pagare e le richieste di aiuto arrivate al 1522</p>
   </header>
 
   <div class="r-big" id="big" aria-hidden="true">
@@ -130,11 +130,10 @@
     function keyHTML() {
       if (mode === "aiuti") {
         return '<span><i class="sw sw--dot"></i>Assegni pagabili</span>' +
-          '<span><i class="sw" style="background:var(--red);border-radius:50%"></i>Marche</span>' +
           '<span><i class="sw sw--na"></i>Non partecipa al riparto</span>';
       }
       return CLASS_LABEL.map(function (l, i) { return '<span><i class="sw" style="background:' + CLASS_FILL[i] + '"></i>' + l + "</span>"; }).join("") +
-        '<span><i class="sw sw--ringred"></i>Marche</span><span><i class="sw sw--na"></i>Non calcolato</span>';
+        '<span><i class="sw sw--na"></i>Non calcolato</span>';
     }
     function setTexts() {
       d3.select("#map-head").text(TEXT[mode].head);
