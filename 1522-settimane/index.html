@@ -15,7 +15,7 @@
 <main class="radar">
   <header>
     <h1 class="r-title">Ogni 25 novembre il 1522 squilla di più</h1>
-    <p class="r-sub">Vittime che chiamano il numero antiviolenza e antistalking 1522, settimana per settimana</p>
+    <p class="r-sub">Chiamate al numero antiviolenza e antistalking 1522 per chiedere aiuto o segnalare una violenza, settimana per settimana</p>
   </header>
 
   <div class="r-big" id="big" aria-hidden="true">
@@ -43,7 +43,7 @@
     var data = rows.map(function (r) {
       var s = parseD(r["Inizio settimana"]), e = parseD(r["Fine settimana"]);
       var y = s.getFullYear(), nov25 = new Date(y, 10, 25);
-      return { s: s, e: e, mid: d3.timeDay.offset(s, 3), v: R.num(r["Vittime che chiamano il 1522"]), y: y, is25: s <= nov25 && nov25 <= e,
+      return { s: s, e: e, mid: d3.timeDay.offset(s, 3), v: R.num(r["Richieste di aiuto al 1522"]), y: y, is25: s <= nov25 && nov25 <= e,
         ok: r["Dati completi"] === "Sì" };
     });
     var years = d3.groups(data, function (d) { return d.y; });
@@ -60,11 +60,11 @@
 
     // ---- Big number ----
     var bigNum = d3.select("#big-num"), fp = function (v) { return "+" + fmt(v, 0); };
-    d3.select("#big-label").text("in media, nella settimana del 25 novembre, le vittime che chiedono aiuto al 1522 rispetto a una settimana qualsiasi dello stesso anno (" + y0 + "-" + lastFull + ")");
+    d3.select("#big-label").text("in media, nella settimana del 25 novembre, le richieste di aiuto al 1522 rispetto a una settimana qualsiasi dello stesso anno (" + y0 + "-" + lastFull + ")");
     var big = (avgRatio - 1) * 100;
     if (R.reduced) bigNum.text(fp(big));
     else { bigNum.text(fp(0)); R.onFirstView(document.getElementById("big"), function () { R.countUp(bigNum, big, fp, "play"); }); }
-    d3.select("#key").html('<span><i class="sw" style="background:var(--blue);height:2px;border-radius:0"></i>Vittime per settimana</span>' +
+    d3.select("#key").html('<span><i class="sw" style="background:var(--blue);height:2px;border-radius:0"></i>Richieste di aiuto per settimana</span>' +
       '<span><i class="sw" style="background:var(--red);border-radius:50%"></i>Settimana del 25 novembre</span>' +
       '<span><i class="sw" style="background:none;border-top:2px dashed var(--grey);height:0;border-radius:0"></i>Dati incompleti (inizio 2023)</span>');
 
@@ -89,9 +89,9 @@
 
       d3.select(host).select("svg").remove();
       var svg = d3.select(host).insert("svg", ".r-tip").attr("width", W).attr("height", H).attr("role", "img")
-        .attr("aria-label", "Grafico a linea: le vittime che chiamano il 1522 ogni settimana dal " + y0 + " a settembre 2024. Ogni anno la settimana del 25 novembre è tra le più alte: in media il " +
-          fmt(big, 0) + "% in più di una settimana qualsiasi. Il massimo è " + fmt(max.v, 0) + " vittime nella settimana dal " + dFull(max.s) + ".");
-      svg.append("title").text("Vittime che chiamano il 1522 per settimana");
+        .attr("aria-label", "Grafico a linea: le richieste di aiuto al 1522 ogni settimana dal " + y0 + " a settembre 2024. Ogni anno la settimana del 25 novembre è tra le più alte: in media il " +
+          fmt(big, 0) + "% in più di una settimana qualsiasi. Il massimo è " + fmt(max.v, 0) + " richieste di aiuto nella settimana dal " + dFull(max.s) + ".");
+      svg.append("title").text("Richieste di aiuto al 1522 per settimana");
       var g = svg.append("g").attr("transform", "translate(" + m.left + "," + m.top + ")");
 
       var ticks = y.ticks(narrow ? 3 : 4);
@@ -151,7 +151,7 @@
           var yrAvg = d3.mean(data.filter(function (q) { return q.y === d.y && q.ok; }), function (q) { return q.v; });
           tip.show(R.tipHTML({
             title: "Dal " + dDM(d.s).trim() + " al " + dFull(d.e).trim(),
-            value: fmt(d.v, 0), unit: "vittime",
+            value: fmt(d.v, 0), unit: "richieste di aiuto",
             rows: [["Media settimanale " + d.y, fmt(yrAvg, 0)]],
             note: !d.ok ? "Dati incompleti: in queste settimane gran parte delle chiamate non è attribuita a una provincia"
               : d.is25 ? "Settimana del 25 novembre, Giornata internazionale contro la violenza sulle donne" : (d === max ? "Il valore più alto della serie" : null)
