@@ -1,0 +1,43 @@
+Nome;Regione;Lat;Lon;Ettari a terra;Ettari a mare;Anno di istituzione;Norma;Attività prevalente;Origine;Inquinanti
+Casale Monferrato;Piemonte;45,13;8,45;73.895;0;1998;L. 426/1998;Amianto;"Stabilimento Eternit di cemento-amianto, chiuso nel 1986; 48 comuni coinvolti dal polverino disperso in case e cortili";Amianto
+Sulcis-Iglesiente-Guspinese;Sardegna;39,25;8,50;19.751;32.416;2001;D.M. 468/2001;Miniere e metallurgia;Secoli di miniere di piombo e zinco e polo metallurgico di Portovesme;Metalli pesanti (piombo, zinco, cadmio, arsenico)
+Pieve Vergonte;Piemonte;46,01;8,26;15.687;0;1998;L. 426/1998;Chimica;"Stabilimento Rumianca poi Enichem: derivati del cloro e DDT; veleni scesi lungo il Toce fino al Lago Maggiore";DDT, arsenico, mercurio, composti clorurati
+Bacino del Fiume Sacco;Lazio;41,73;13,00;7.235;0;2005;L. 248/2005;Chimica;"Polo chimico di Colleferro (esplosivi e pesticidi); fusti di lindano interrati contaminarono fiume e campi";Beta-esaclorocicloesano (lindano), solventi
+Brindisi;Puglia;40,63;17,98;5.696;5.577;1998;L. 426/1998;Petrolchimica e raffinazione;Petrolchimico nato negli anni Sessanta e centrali a carbone;Idrocarburi, IPA, metalli pesanti, solventi clorurati
+Priolo;Sicilia;37,15;15,20;5.814;10.129;1998;L. 426/1998;Petrolchimica e raffinazione;Polo di Augusta-Priolo-Melilli dal 1950: raffinerie, petrolchimica, cloro-soda, Eternit siciliana;Idrocarburi, mercurio, IPA, diossine, amianto, metalli
+Taranto;Puglia;40,50;17,20;4.383;7.006;1998;L. 426/1998;Siderurgia;Acciaieria ex Ilva, raffineria Eni, cementificio, arsenale e discariche;IPA, diossine, PCB, metalli pesanti, cromo esavalente
+Val Basento;Basilicata;40,50;16,38;3.330;0;2002;L. 179/2002;Petrolchimica e raffinazione;Area industriale ex Anic/Enichem di Ferrandina e Pisticci;Idrocarburi, solventi, metalli, amianto
+Porto Torres;Sardegna;40,83;8,38;1.874;2.748;2002;L. 179/2002;Petrolchimica e raffinazione;Petrolchimico Sir poi Enichem, dagli anni Sessanta;Idrocarburi, solventi clorurati, metalli
+Venezia (Porto Marghera);Veneto;45,46;12,24;1.618;0;1998;L. 426/1998;Petrolchimica e raffinazione;"Polo industriale dal 1917, costruito anche con rifiuti; petrolchimico e metallurgia, apice negli anni Sessanta";Arsenico, metalli, idrocarburi, solventi, PCB, diossine
+Laghi di Mantova e Polo chimico;Lombardia;45,16;10,82;1.027;0;2002;L. 179/2002;Petrolchimica e raffinazione;Petrolchimico, ex cloro-soda ed ex raffineria Ies affacciati sui laghi;Mercurio, idrocarburi
+Piombino;Toscana;42,93;10,53;931;2.117;1998;L. 426/1998;Siderurgia;Acciaierie (ex Lucchini) e discariche industriali sulla costa;Metalli pesanti, IPA
+Crotone-Cassano-Cerchiara;Calabria;39,09;17,12;884;1.448;2001;D.M. 468/2001;Miniere e metallurgia;"Metallurgia dello zinco ex Pertusola e chimica dei fosfati; scorie finite come inerti in scuole, strade e case";Zinco, cadmio, piombo, arsenico
+Napoli Orientale;Campania;40,85;14,30;834;1.433;1998;L. 426/1998;Petrolchimica e raffinazione;Depositi petroliferi, ex raffineria e poli manifatturieri storici;Idrocarburi, IPA, metalli pesanti, solventi clorurati
+Gela;Sicilia;37,06;14,29;795;4.583;1998;L. 426/1998;Petrolchimica e raffinazione;Raffineria e petrolchimico Eni dagli anni Sessanta;Idrocarburi, mercurio, metalli, solventi
+Terni-Papigno;Umbria;42,57;12,66;625;0;2001;D.M. 468/2001;Siderurgia;Ex stabilimento chimico di Papigno e discariche delle acciaierie;Metalli pesanti (cromo, nichel), IPA
+Milazzo;Sicilia;38,22;15,25;549;2.198;2005;L. 266/2005;Petrolchimica e raffinazione;Raffineria e centrale termoelettrica;Idrocarburi, metalli
+Cengio e Saliceto;Liguria e Piemonte;44,39;8,20;331;0;1998;L. 426/1998;Chimica;"Acna, fabbrica di coloranti ed esplosivi attiva per oltre un secolo, chiusa nel 1999; inquinò la Bormida";Ammine aromatiche, composti organici clorurati
+Biancavilla;Sicilia;37,64;14,87;330;0;2001;D.M. 468/2001;Amianto;Cava di Monte Calvario: fluoro-edenite, fibra simile all'amianto presente nella roccia e usata in edilizia;Fibre di fluoro-edenite
+Balangero;Piemonte;45,27;7,52;314;0;1998;L. 426/1998;Amianto;La più grande miniera di amianto dell'Europa occidentale, attiva fino al 1990;Amianto
+Manfredonia;Puglia;41,62;15,93;303;855;1998;L. 426/1998;Chimica;"Stabilimento Enichem di fertilizzanti; incidente con rilascio di arsenico nel 1976";Arsenico, metalli, composti chimici
+Brescia-Caffaro;Lombardia;45,53;10,20;262;0;2002;L. 179/2002;Chimica;"Caffaro, dal 1938 principale produttore italiano di PCB fino al 1984; veleni nelle rogge, negli orti e nella catena alimentare";PCB, diossine, mercurio, arsenico
+Sesto San Giovanni;Lombardia;45,54;9,23;255;0;2000;L. 388/2000;Siderurgia;Acciaierie e meccanica pesante (Falck, Breda, Marelli);Metalli pesanti, idrocarburi
+Bussi sul Tirino;Abruzzo;42,21;13,82;236;0;2008;D.M. 29/05/2008;Chimica;Polo chimico Montedison e discariche abusive come Tre Monti, vicine ai pozzi della Val Pescara;Solventi clorurati, mercurio, piombo
+Livorno;Toscana;43,57;10,32;206;577;2001;D.M. 468/2001;Petrolchimica e raffinazione;Raffineria di Stagno e area portuale-industriale;Idrocarburi, metalli
+Orbetello (ex Sitoco);Toscana;42,45;11,22;204;2.645;2002;L. 179/2002;Chimica;Fabbrica di fertilizzanti Sitoco sulla laguna: ceneri di pirite ricche di metalli;Arsenico, piombo, cadmio
+Caffaro di Torviscosa;Friuli-Venezia Giulia;45,82;13,28;201;0;2001;D.M. 468/2001;Chimica;"Impianto cloro-soda a mercurio; canali verso la laguna di Marano e Grado";Mercurio
+Trieste;Friuli-Venezia Giulia;45,62;13,79;190;1.196;2001;D.M. 468/2001;Siderurgia;Ferriera di Servola, raffineria e discariche costiere;IPA, metalli pesanti, idrocarburi
+Massa e Carrara;Toscana;44,04;10,10;116;0;1998;L. 426/1998;Chimica;Zona industriale apuana: Farmoplant (pesticidi, esplosa nel 1988), Rumianca, Ferroleghe;Pesticidi, solventi clorurati, cromo esavalente, metalli
+Falconara Marittima;Marche;43,63;13,39;108;1.165;2002;L. 179/2002;Petrolchimica e raffinazione;Raffineria Api sulla costa;Idrocarburi
+Pioltello-Rodano;Lombardia;45,50;9,33;84;0;2000;L. 388/2000;Chimica;Polo chimico ex Sisas e le sue tre discariche, al centro di una procedura di infrazione Ue;Nerofumo contaminato da mercurio, idrocarburi
+Serravalle Scrivia;Piemonte;44,72;8,86;74;0;2002;L. 179/2002;Rifiuti;Ex Ecolibarna: impianto di oli lubrificanti poi trattamento di rifiuti tossici;Solventi clorurati, idrocarburi, rifiuti acidi
+Tito;Basilicata;40,60;15,66;57;0;2001;D.M. 468/2001;Chimica;Ex Liquichimica (fertilizzanti) con bacino di fosfogessi, scorie siderurgiche;Solventi clorurati, fosfogessi, metalli
+Cogoleto-Stoppani;Liguria;44,39;8,65;44;167;2001;D.M. 468/2001;Chimica;Stoppani, chimica del cromo dai primi del Novecento al 2003;Cromo esavalente
+Trento Nord;Trentino-Alto Adige;46,09;11,12;24;0;2001;D.M. 468/2001;Chimica;Ex Sloi (piombo tetraetile per benzine, chiusa nel 1978) ed ex Carbochimica;Piombo tetraetile, IPA, mercurio
+Emarese;Valle d'Aosta;45,72;7,70;23;0;2001;D.M. 468/2001;Amianto;Cave di amianto crisotilo coltivate dal 1872 al 1970;Amianto
+Fidenza;Emilia-Romagna;44,87;10,06;16;0;2001;D.M. 468/2001;Chimica;Ex Cip (fertilizzanti, chimica pesante) ed ex Carbochimica, discariche;IPA, metalli, composti chimici
+Broni;Lombardia;45,06;9,26;15;0;2002;L. 179/2002;Amianto;Fibronit, fabbrica di cemento-amianto;Amianto
+Bari-Fibronit;Puglia;41,10;16,87;15;0;2001;D.M. 468/2001;Amianto;Fibronit, fabbrica di cemento-amianto in città;Amianto
+Officina Grande Riparazione ETR di Bologna;Emilia-Romagna;44,50;11,33;13;0;2017;L. 205/2017;Amianto;Officine ferroviarie dove si scoibentavano i treni dall'amianto;Amianto
+Napoli Bagnoli-Coroglio;Campania;40,81;14,17;249;1.453;2000;L. 388/2000;Siderurgia;Acciaieria Italsider, Eternit e Federconsorzi sul golfo di Pozzuoli;IPA, metalli pesanti, amianto
+Area vasta di Giugliano;Campania;40,93;14,10;;;2020;L. 120/2020;Rifiuti;Discariche e sversamenti illegali di rifiuti nella Terra dei fuochi;Rifiuti urbani e industriali, percolato

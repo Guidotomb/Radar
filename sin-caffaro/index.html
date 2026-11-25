@@ -1,0 +1,163 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Il caso Caffaro di Brescia in numeri e in cronologia – Radar QN</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Libre+Franklin:wght@400;500;600;700&family=Newsreader:opsz,wght@6..72,400;6..72,700&display=swap">
+<link rel="stylesheet" href="../assets/radar.css">
+<style>
+  .bigs { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px 24px; margin-top: 24px; }
+  .bigs .r-big { display: block; margin: 0; }
+  .bigs .r-big__num { display: block; font-size: 40px; }
+  .bigs .r-big__unit { font-size: 20px; margin-left: 3px; }
+  .bigs .r-big__label { display: block; margin-top: 4px; font-size: 13px; }
+  @media (max-width: 559px) { .bigs { grid-template-columns: repeat(2, minmax(0, 1fr)); } .bigs .r-big__num { font-size: 34px; } }
+  .r-key b { color: var(--ink); font-weight: 600; font-variant-numeric: tabular-nums; }
+  .tl-band { fill: var(--grey-5); }
+  .tl-band-label { font-size: 12px; font-weight: 600; fill: var(--ink-2); }
+  .tl-axis { stroke: var(--ink); stroke-width: 1; }
+  .tl-dot { fill: var(--blue); stroke: var(--bg); stroke-width: 2; cursor: pointer; }
+  .tl-dot--hot { fill: var(--red); }
+  .tl-year { font-size: 12px; fill: var(--ink-2); font-variant-numeric: tabular-nums; }
+  .tl-lab { font-size: 12px; font-weight: 600; fill: var(--ink); paint-order: stroke; stroke: var(--bg); stroke-width: 4px; stroke-linejoin: round; }
+  .tl-stem { stroke: var(--grey-light); stroke-width: 1; }
+  .tl-hit { fill: transparent; cursor: pointer; }
+</style>
+<script src="https://cdn.jsdelivr.net/npm/d3@7.9.0"></script>
+<script src="../assets/radar.js"></script>
+</head>
+<body>
+<main class="radar">
+  <header>
+    <h1 class="r-title">Caffaro, il sito inquinato di Brescia in numeri</h1>
+    <p class="r-sub">Il sito di interesse nazionale Brescia-Caffaro: la contaminazione da PCB, lo stato della bonifica e le tappe principali, dal 1906 a oggi</p>
+  </header>
+
+  <div class="bigs" id="bigs" aria-hidden="true"></div>
+
+  <figure class="r-chart" id="waffle">
+    <p class="r-chart__head">I 262 ettari di suolo del SIN, un quadratino per ettaro</p>
+    <p class="r-chart__sub">Stato del procedimento di bonifica, giugno 2024</p>
+    <div class="r-key" id="key" style="margin:0 0 12px"></div>
+  </figure>
+
+  <figure class="r-chart" id="tl">
+    <p class="r-chart__head">Le tappe</p>
+    <p class="r-chart__sub">Passa sopra o tocca un punto per leggere la scheda. In rosso l'anno in cui il caso diventa pubblico</p>
+  </figure>
+
+  <footer class="r-foot">
+    <span>Fonte: Legambiente su dati del ministero dell'Ambiente (giugno 2024); Comune di Brescia; Ats Brescia; Il Giorno</span>
+    <span>Elaborazione Radar – QN</span>
+  </footer>
+</main>
+
+<script>
+(function () {
+  var R = Radar, fmt = R.fmt;
+  var f0 = function (v) { return fmt(v, 0); };
+  var COL = ["var(--blue-1)", "var(--blue-4)", "var(--grey-2)", "var(--grey-3)", "var(--grey-4)", "var(--grey-5)"];
+  var L = function (name, url) { return window[name] ? Promise.resolve(R.parseCSV(window[name])) : R.loadCSV(url); };
+
+  Promise.all([L("CAF_NUM", "../data/sin-caffaro-numeri.csv"), L("CAF_SUOLO", "../data/sin-caffaro-suolo.csv"), L("CAF_TL", "../data/sin-caffaro-timeline.csv")]).then(function (res) {
+    var suolo = res[1].map(function (r, i) { return { k: r["Stato"], v: R.num(r["Ettari"]), c: COL[i] }; });
+    var tot = d3.sum(suolo, function (d) { return d.v; });
+    var bon = suolo[0];
+    var nums = res[0].map(function (r) { return { v: R.num(r["Valore"]), u: r["Unità"], l: r["Etichetta"], dec: 0 }; });
+    nums.push({ v: bon.v / tot * 100, u: "%", l: "del suolo del SIN bonificato e certificato", dec: 1, red: true });
+
+    // ---- Numeri grandi ----
+    var b = d3.select("#bigs").selectAll("div").data(nums).join("div").attr("class", "r-big");
+    var n = b.append("span").attr("class", "r-big__num").style("color", function (d) { return d.red ? "var(--red)" : null; });
+    n.append("span").attr("class", "v");
+    n.append("span").attr("class", "r-big__unit").text(function (d) { return d.u; });
+    b.append("span").attr("class", "r-big__label").text(function (d) { return d.l; });
+    var vs = n.select(".v");
+    var fv = function (d) { return function (x) { return fmt(x, d.dec); }; };
+    if (R.reduced) vs.each(function (d) { d3.select(this).text(fv(d)(d.v)); });
+    else { vs.each(function (d) { d3.select(this).text(fv(d)(0)); });
+      R.onFirstView(document.getElementById("bigs"), function () { vs.each(function (d) { R.countUp(d3.select(this), d.v, fv(d), "play"); }); }); }
+
+    // ---- Waffle ----
+    d3.select("#key").html(suolo.map(function (d) { return '<span><i class="sw" style="background:' + d.c + '"></i>' + d.k + " <b>" + f0(d.v) + "</b></span>"; }).join(""));
+    var host = document.getElementById("waffle");
+    var tip = R.tooltip(host), cells;
+    R.dismissOutside(host, function () { tip.hide(); if (cells) cells.classed("is-dimmed", false); });
+    var list = [];
+    suolo.forEach(function (d) { for (var i = 0; i < d.v; i++) list.push(d); });
+    R.responsive(host, function (W, phase) {
+      var gap = 2, size = W < 520 ? 14 : 16;
+      var cols = Math.floor((W + gap) / (size + gap));
+      var rows = Math.ceil(list.length / cols);
+      var H = rows * (size + gap) - gap;
+      d3.select(host).select("svg").remove();
+      var svg = d3.select(host).insert("svg", ".r-tip").attr("width", W).attr("height", H).attr("role", "img")
+        .attr("aria-label", "Dei " + f0(tot) + " ettari di suolo del SIN Brescia-Caffaro, " + suolo.map(function (d) { return f0(d.v) + " " + d.k.toLowerCase(); }).join(", ") + ".");
+      cells = svg.append("g").selectAll("rect").data(list).join("rect").attr("class", "mark")
+        .attr("x", function (d, i) { return (i % cols) * (size + gap); })
+        .attr("y", function (d, i) { return Math.floor(i / cols) * (size + gap); })
+        .attr("width", size).attr("height", size).attr("rx", 2).style("fill", function (d) { return d.c; });
+      R.enter(cells, phase, function (s) { s.style("opacity", 0); }, function (s) { (s.delay ? s.delay(function (d, i) { return i * 2; }) : s).style("opacity", 1); });
+      cells.on("pointerenter pointerdown", function (ev, d) {
+        cells.classed("is-dimmed", function (q) { return q !== d; });
+        var bb = this.getBBox();
+        tip.show(R.tipHTML({ title: d.k, value: f0(d.v), unit: "ettari", note: fmt(d.v / tot * 100, 1) + "% del suolo del SIN" }), bb.x + size / 2, bb.y);
+      }).on("pointerleave", function (ev) { if (ev.pointerType === "mouse") { tip.hide(); cells.classed("is-dimmed", false); } });
+    });
+
+    // ---- Timeline ----
+    var ev = res[2].map(function (r) { return { y: +r["Anno"], t: r["Titolo"], x: r["Testo"], hot: !!r["Evidenza"] }; });
+    var pcb0 = 1938, pcb1 = 1984;
+    var host2 = document.getElementById("tl");
+    var tip2 = R.tooltip(host2), dots;
+    R.dismissOutside(host2, function () { tip2.hide(); if (dots) dots.classed("is-dimmed", false); });
+    R.responsive(host2, function (W, phase) {
+      var narrow = R.isNarrow(W);
+      var m = { l: 8, r: 8 }, H = 140, axY = 104;
+      var x = d3.scaleLinear().domain([1900, 2030]).range([m.l, W - m.r]);
+      d3.select(host2).select("svg").remove();
+      var svg = d3.select(host2).insert("svg", ".r-tip").attr("width", W).attr("height", H).attr("role", "img")
+        .attr("aria-label", "Cronologia del caso Caffaro dal " + ev[0].y + " al " + ev[ev.length - 1].y + ": " + ev.map(function (d) { return d.y + ", " + d.t.toLowerCase(); }).join("; ") + ".");
+      svg.append("rect").attr("class", "tl-band").attr("x", x(pcb0)).attr("width", x(pcb1) - x(pcb0)).attr("y", 18).attr("height", axY - 18);
+      svg.append("text").attr("class", "tl-band-label").attr("x", x(pcb0) + 6).attr("y", 32);
+      svg.append("line").attr("class", "tl-axis").attr("x1", x(1900)).attr("x2", x(2030)).attr("y1", axY + 0.5).attr("y2", axY + 0.5);
+      var dec = d3.range(1900, 2031, narrow ? 25 : 20);
+      svg.append("g").selectAll("text").data(dec).join("text").attr("class", "tl-year").attr("text-anchor", "middle")
+        .attr("x", function (d) { return x(d); }).attr("y", axY + 20).text(function (d) { return d; });
+      // etichette solo sulle tappe principali, le altre nella scheda; livelli sfalsati per non sovrapporsi
+      var POS = narrow
+        ? { 1906: [50, "start", "La fabbrica"], 2001: [70, "end", "Caso pubblico"], 2026: [30, "end", "Demolizioni"] }
+        : { 1906: [50, "start"], 1938: [70, "start"], 1984: [50, "end"], 2001: [70, "end"], 2026: [30, "end"] };
+      svg.select(".tl-band-label").text(narrow ? "PCB" : "Produzione di PCB, 1938-1984");
+      var lab = svg.append("g");
+      ev.filter(function (d) { return POS[d.y]; }).forEach(function (d) {
+        var p = POS[d.y], ly = p[0], dx = p[1] === "start" ? 6 : -6;
+        lab.append("line").attr("class", "tl-stem").attr("x1", x(d.y)).attr("x2", x(d.y)).attr("y1", ly - 12).attr("y2", axY - 6);
+        lab.append("text").attr("class", "tl-lab").attr("x", x(d.y) + dx).attr("y", ly).attr("text-anchor", p[1])
+          .style("fill", d.hot ? "var(--red)" : null).text(d.y + " · " + (p[2] || d.t));
+      });
+      R.enter(lab, phase, function (s) { s.style("opacity", 0); }, function (s) { s.style("opacity", 1); }, R.DUR * 0.6);
+      dots = svg.append("g").selectAll("circle").data(ev).join("circle").attr("class", function (d) { return "tl-dot mark" + (d.hot ? " tl-dot--hot" : ""); })
+        .attr("cx", function (d) { return x(d.y); }).attr("cy", axY);
+      R.enter(dots, phase, function (s) { s.attr("r", 0); }, function (s) { (s.delay ? s.delay(function (d, i) { return i * 50; }) : s).attr("r", 5.5); });
+      dots.filter(function (d) { return d.hot; }).raise();
+      // aree di tocco: Voronoi lungo l'asse, così anche i punti vicini (2001-2003) si prendono bene
+      var xs = ev.map(function (d) { return x(d.y); });
+      svg.append("g").selectAll("rect").data(ev).join("rect").attr("class", "tl-hit")
+        .attr("x", function (d, i) { return i ? (xs[i - 1] + xs[i]) / 2 : 0; })
+        .attr("width", function (d, i) { var a = i ? (xs[i - 1] + xs[i]) / 2 : 0, b2 = i < xs.length - 1 ? (xs[i] + xs[i + 1]) / 2 : W; return b2 - a; })
+        .attr("y", axY - 30).attr("height", 60)
+        .on("pointerenter pointerdown", function (e, d) {
+          dots.classed("is-dimmed", function (q) { return q !== d; });
+          tip2.show(R.tipHTML({ title: String(d.y), value: null, rows: [], note: null }).replace('</div>', '</div><div style="font-weight:600;margin:2px 0 4px">' + d.t + '</div><div>' + d.x + '</div>'), x(d.y), axY - 8);
+        }).on("pointerleave", function (e) { if (e.pointerType === "mouse") { tip2.hide(); dots.classed("is-dimmed", false); } });
+    });
+  }).catch(function (e) { R.fail("#bigs", e); });
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,294 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>I 42 siti contaminati di interesse nazionale in Italia – Radar QN</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Libre+Franklin:wght@400;500;600;700&family=Newsreader:opsz,wght@6..72,400;6..72,700&display=swap">
+<link rel="stylesheet" href="../assets/radar.css">
+<style>
+  /* due viste nella stessa mappa: schede in alto, filtri sotto */
+  .r-views { display: flex; gap: 0; margin: 24px 0 0; border-bottom: 1px solid var(--rule); }
+  .r-views button {
+    font: 600 14px/1.2 var(--sans); color: var(--ink-2); background: transparent; border: 0;
+    border-bottom: 2px solid transparent; margin-bottom: -1px; padding: 8px 14px 9px 0; margin-right: 18px; cursor: pointer; text-align: left;
+  }
+  .r-views button[aria-selected="true"] { color: var(--ink); border-bottom-color: var(--ink); }
+  .r-views button small { display: block; font-weight: 400; font-size: 12px; color: var(--ink-2); margin-top: 2px; }
+  .r-filters { display: flex; flex-wrap: wrap; gap: 6px; margin: 14px 0 0; }
+  .r-filters[hidden] { display: none; }
+  .r-filters button {
+    font: 500 12px/1 var(--sans); color: var(--ink); background: transparent;
+    border: 1px solid var(--rule); border-radius: 999px; padding: 7px 11px; cursor: pointer;
+    font-variant-numeric: tabular-nums; transition: background 150ms ease, color 150ms ease, border-color 150ms ease;
+  }
+  .r-filters button b { font-weight: 600; color: var(--ink-2); margin-left: 4px; }
+  .r-filters button[aria-pressed="true"] { background: var(--ink); border-color: var(--ink); color: var(--bg); }
+  .r-filters button[aria-pressed="true"] b { color: var(--bg); opacity: .75; }
+  .region { fill: var(--grey-5); stroke: var(--bg); stroke-width: .8; }
+  .nation { fill: none; stroke: var(--grey-4); stroke-width: .5; }
+  .sin { stroke: var(--bg); stroke-width: 1; transition: fill 300ms ease, fill-opacity 300ms ease; }
+  .sin--na { fill: var(--bg) !important; fill-opacity: 1 !important; stroke-width: 1.5; }
+  .map-label { font-size: 12px; font-weight: 600; fill: var(--ink); paint-order: stroke; stroke: var(--bg); stroke-width: 4px; stroke-linejoin: round; pointer-events: none; }
+  .map-label--sub { font-weight: 400; fill: var(--ink-2); }
+</style>
+<script src="https://cdn.jsdelivr.net/npm/d3@7.9.0"></script>
+<script src="../assets/radar.js"></script>
+</head>
+<body>
+<main class="radar">
+  <header>
+    <h1 class="r-title">I 42 siti contaminati di interesse nazionale in Italia</h1>
+    <p class="r-sub">Siti di interesse nazionale per le bonifiche (SIN). Ogni cerchio è proporzionale alla superficie contaminata a terra, in ettari</p>
+  </header>
+
+  <div class="r-views" id="views" role="tablist" aria-label="Scegli la vista"></div>
+
+  <div class="r-big" id="big" aria-hidden="true">
+    <span class="r-big__num"><span id="big-num">&nbsp;</span><span class="r-big__unit" id="big-of"></span></span>
+    <span class="r-big__label" id="big-label"></span>
+  </div>
+
+  <div class="r-filters" id="filters" role="group" aria-label="Filtra per attività prevalente"></div>
+  <div class="r-filters" id="mats" role="group" aria-label="Scegli suolo o acque sotterranee" hidden></div>
+
+  <figure class="r-chart" id="map" style="margin-top:12px"></figure>
+
+  <div class="r-key" id="key"></div>
+  <p class="r-note" id="note"></p>
+
+  <footer class="r-foot">
+    <span>Fonte: Ispra su dati del ministero dell'Ambiente (giugno 2024); Legambiente; Regioni e Arpa</span>
+    <span>Elaborazione Radar – QN</span>
+  </footer>
+</main>
+
+<script>
+(function () {
+  var R = Radar, fmt = R.fmt;
+  var f0 = function (v) { return fmt(v, 0); };
+  var FOCUS = "Brescia-Caffaro";
+  // riquadro dell'Italia: la proiezione non dipende dal caricamento dei confini
+  var BOX = { type: "Feature", geometry: { type: "Polygon", coordinates: [[[6.6, 36.6], [6.6, 47.1], [18.6, 47.1], [18.6, 36.6], [6.6, 36.6]]] } };
+  var VIEWS = [
+    { k: "dove", label: "Dove sono", sub: "e cosa li ha inquinati" },
+    { k: "bon", label: "A che punto è la bonifica", sub: "quota di area con iter concluso" }
+  ];
+  var CLS = [
+    { max: 5, label: "Meno del 5%", c: "var(--red)" },
+    { max: 20, label: "Dal 5 al 20%", c: "var(--blue-4)" },
+    { max: 50, label: "Dal 20 al 50%", c: "var(--blue-3)" },
+    { max: 1e9, label: "Oltre il 50%", c: "var(--blue-1)" }
+  ];
+  var MAT = [{ k: "suolo", label: "Suolo" }, { k: "falda", label: "Acque sotterranee" }];
+  function cls(v) { for (var i = 0; i < CLS.length; i++) if (v < CLS[i].max) return CLS[i]; }
+
+  // confini regionali Istat (GeoJSON locale, già usato da altri grafici Radar)
+  function loadGeo() {
+    return fetch("../data/sin-regioni.geojson").then(function (r) { if (!r.ok) throw 0; return r.json(); })
+      .then(function (g) { return { regions: g.features }; }).catch(function () { return null; });
+  }
+  var L = function (name, url) { return window[name] ? Promise.resolve(R.parseCSV(window[name])) : R.loadCSV(url); };
+
+  Promise.all([L("SIN_CSV", "../data/sin-siti.csv"), L("BON_CSV", "../data/sin-bonifiche.csv"), loadGeo()]).then(function (res) {
+    var bon = {};
+    res[1].forEach(function (r) {
+      bon[r["Nome"]] = {
+        suolo: { car: R.num(r["Suolo caratterizzato"]), prog: R.num(r["Suolo progetto approvato"]), concl: R.num(r["Suolo concluso"]) },
+        falda: { car: R.num(r["Falda caratterizzata"]), prog: R.num(r["Falda progetto approvato"]), concl: R.num(r["Falda concluso"]) },
+        nota: r["Nota"]
+      };
+    });
+    var data = res[0].map(function (r) {
+      return {
+        nome: r["Nome"], regione: r["Regione"], lat: R.num(r["Lat"]), lon: R.num(r["Lon"]),
+        terra: R.num(r["Ettari a terra"]), mare: R.num(r["Ettari a mare"]), anno: r["Anno di istituzione"],
+        att: r["Attività prevalente"], origine: r["Origine"], inq: r["Inquinanti"], b: bon[r["Nome"]] || {}
+      };
+    });
+    var geo = res[2];
+    var tot = d3.sum(data, function (d) { return d.terra || 0; });
+    var maxD = data.reduce(function (a, b) { return (b.terra || 0) > (a.terra || 0) ? b : a; });
+    var share = maxD.terra / tot;
+    var view = "dove", active = null, mat = "suolo";
+    var has = function (d) { return d.b[mat] && d.b[mat].concl != null; };
+
+    // ---- testi che cambiano con la vista ----
+    var bigNum = d3.select("#big-num"), seen = R.reduced;
+    function texts(animate) {
+      var n, label, of = "";
+      if (view === "dove") {
+        n = data.length;
+        label = "siti contaminati di interesse nazionale, su circa " + f0(Math.round(tot / 1000)) + "mila ettari a terra. " + maxD.nome + " da solo ne copre il " + fmt(share * 100, 0) + "%";
+        d3.select("#key").html('<span><i class="sw" style="background:var(--blue);border-radius:50%"></i>Sito di interesse nazionale</span>' +
+          '<span><i class="sw" style="background:var(--red);border-radius:50%"></i>' + FOCUS + '</span>' +
+          '<span><i class="sw sw--ring"></i>Superficie non ancora disponibile</span>');
+        d3.select("#note").text("Superficie a terra; i tratti di mare sono nel dettaglio di ciascun sito. L'attività prevalente è quella che ha causato la contaminazione principale (elaborazione Radar). " +
+          "L'Area vasta di Giugliano è stata perimetrata nel luglio 2025: la sua superficie non è ancora nei dati Ispra.");
+      } else {
+        var w = data.filter(has), low = w.filter(function (d) { return d.b[mat].concl < 20; }).length, zero = w.filter(function (d) { return d.b[mat].concl === 0; }).length;
+        n = low;
+        var cosa = mat === "suolo" ? "del suolo" : "delle acque sotterranee";
+        label = "siti hanno chiuso la bonifica " + cosa + " su meno di un quinto della loro area. " +
+          "In " + zero + " non ne hanno chiusa nemmeno una parte";
+        of = " su " + w.length;
+        d3.select("#key").html(CLS.map(function (c) { return '<span><i class="sw" style="background:' + c.c + ';border-radius:50%"></i>' + c.label + "</span>"; }).join("") +
+          '<span><i class="sw" style="border:2px solid var(--grey-3);border-radius:50%;background:var(--bg)"></i>Dato non disponibile o non applicabile</span>');
+        d3.select("#note").text("Quota della superficie del SIN su cui il procedimento è concluso, a giugno 2024: la bonifica o la messa in sicurezza è terminata, oppure le analisi hanno escluso la contaminazione. " +
+          "Per alcuni siti la quota si riferisce solo a una parte dell'area (dettaglio nella scheda di ciascun sito).");
+      }
+      d3.select("#big-label").text(label);
+      d3.select("#big-of").text(of);
+      if (!seen) bigNum.text("0");
+      else R.countUp(bigNum, n, f0, animate && !R.reduced ? "play" : "static");
+      R.scheduleHeight();
+    }
+    R.onFirstView(document.getElementById("big"), function () { seen = true; texts(true); });
+
+    // ---- schede e filtri ----
+    var vbtn = d3.select("#views").selectAll("button").data(VIEWS).join("button").attr("type", "button").attr("role", "tab")
+      .attr("aria-selected", function (d) { return d.k === view; })
+      .html(function (d) { return d.label + "<small>" + d.sub + "</small>"; })
+      .on("click", function (ev, d) {
+        if (d.k === view) return;
+        view = d.k;
+        vbtn.attr("aria-selected", function (q) { return q.k === view; });
+        d3.select("#filters").attr("hidden", view === "dove" ? null : "");
+        d3.select("#mats").attr("hidden", view === "bon" ? null : "");
+        tip.hide(); clear(); paint(true); texts(true);
+      });
+
+    var cats = d3.rollups(data, function (v) { return v.length; }, function (d) { return d.att; }).sort(function (a, b) { return b[1] - a[1]; });
+    var fbtn = d3.select("#filters").selectAll("button").data([["Tutti", data.length]].concat(cats)).join("button")
+      .attr("type", "button").attr("aria-pressed", function (d, i) { return i === 0; })
+      .html(function (d) { return d[0] + "<b>" + d[1] + "</b>"; })
+      .on("click", function (ev, d) {
+        active = d[0] === "Tutti" ? null : d[0];
+        fbtn.attr("aria-pressed", function (q) { return (active == null && q[0] === "Tutti") || q[0] === active; });
+        tip.hide(); clear(); paint(true);
+      });
+    var mbtn = d3.select("#mats").selectAll("button").data(MAT).join("button").attr("type", "button")
+      .attr("aria-pressed", function (d) { return d.k === mat; }).text(function (d) { return d.label; })
+      .on("click", function (ev, d) {
+        mat = d.k; mbtn.attr("aria-pressed", function (q) { return q.k === mat; });
+        tip.hide(); clear(); paint(true); texts(true);
+      });
+
+    var host = document.getElementById("map");
+    var tip = R.tooltip(host);
+    var clear = function () {}, paint = function () {};
+    R.dismissOutside(host, function () { tip.hide(); clear(); });
+    texts(false);
+
+    R.responsive(host, function (W, phase) {
+      var narrow = R.isNarrow(W);
+      var H = Math.round(Math.min(W * 1.12, 780));
+      var proj = d3.geoConicConformal().parallels([38, 46]).rotate([-12.5, 0]).fitExtent([[narrow ? 4 : 20, 8], [W - (narrow ? 4 : 20), H - 8]], BOX);
+      var path = d3.geoPath(proj);
+      var r = d3.scaleSqrt().domain([0, maxD.terra]).range([0, narrow ? 34 : 56]);
+      var rad = function (d) { return d.terra == null ? 4 : Math.max(2.5, r(d.terra)); };
+      data.forEach(function (d) { var p = proj([d.lon, d.lat]); d.x = p[0]; d.y = p[1]; });
+
+      d3.select(host).select("svg").remove();
+      var svg = d3.select(host).insert("svg", ".r-tip").attr("width", W).attr("height", H).attr("role", "img")
+        .attr("aria-label", "Mappa dei " + data.length + " siti di interesse nazionale per le bonifiche. Il più esteso è " + maxD.nome +
+          ", con " + f0(maxD.terra) + " ettari, il " + fmt(share * 100, 0) + "% della superficie a terra di tutti i siti. Una seconda vista colora i siti per stato della bonifica.");
+      svg.append("title").text("Mappa dei siti di interesse nazionale per le bonifiche");
+
+      if (geo) {
+        var gm = svg.append("g");
+        gm.selectAll("path").data(geo.regions).join("path").attr("class", "region").attr("d", path);
+      }
+
+      var sorted = data.slice().sort(function (a, b) { return (b.terra || 0) - (a.terra || 0); });
+      var dots = svg.append("g").selectAll("circle").data(sorted).join("circle").attr("class", "sin mark")
+        .attr("cx", function (d) { return d.x; }).attr("cy", function (d) { return d.y; });
+      R.enter(dots, phase, function (s) { s.attr("r", 0); }, function (s) { s.attr("r", rad); });
+
+      // etichette dirette: il sito più esteso e quello del pezzo
+      var lab = svg.append("g"), labs = [];
+      var cas = maxD, bre = data.find(function (d) { return d.nome === FOCUS; });
+      var lc = lab.append("text").attr("class", "map-label").attr("x", cas.x).attr("y", cas.y + rad(cas) + 16).attr("text-anchor", "middle");
+      lc.append("tspan").text(cas.nome);
+      lc.append("tspan").attr("class", "map-label--sub").attr("x", cas.x).attr("dy", 15).text(f0(cas.terra) + " ettari");
+      labs.push([lc, cas]);
+      if (bre) {
+        var lb = lab.append("text").attr("class", "map-label").attr("x", bre.x + 8).attr("y", bre.y - 10).style("fill", "var(--red)");
+        lb.append("tspan").text(bre.nome);
+        lb.append("tspan").attr("class", "map-label--sub").attr("x", bre.x + 8).attr("dy", 15).text(f0(bre.terra) + " ettari");
+        labs.push([lb, bre]);
+      }
+      R.enter(lab, phase, function (s) { s.style("opacity", 0); }, function (s) { s.style("opacity", 1); }, R.DUR * 0.8);
+
+      // colori e visibilità secondo la vista; nella vista "dove" i filtri fanno sparire gli altri siti
+      var shown = function (d) { return view !== "dove" || active == null || d.att === active; };
+      var strokeOf = function (d) { return (view === "dove" ? d.terra == null : !has(d)) ? (view === "dove" ? "var(--blue)" : "var(--grey-3)") : null; };
+      var del;
+      paint = function (animate) {
+        var t = animate && !R.reduced ? 300 : 0;
+        dots.classed("is-dimmed", false)
+          .classed("sin--na", function (d) { return view === "dove" ? d.terra == null : !has(d); })
+          .style("stroke", strokeOf)
+          .style("fill", function (d) {
+            if (view === "dove") return d.nome === FOCUS ? "var(--red)" : "var(--blue)";
+            return has(d) ? cls(d.b[mat].concl).c : null;
+          })
+          .style("fill-opacity", function (d) {
+            if (view === "dove") return d.nome === FOCUS ? 1 : 0.62;
+            return d.terra > 20000 ? 0.75 : 0.95;
+          })
+          .style("pointer-events", function (d) { return shown(d) ? null : "none"; });
+        if (t) {
+          dots.transition("f").duration(t).style("opacity", function (d) { return shown(d) ? 1 : 0; })
+            .on("end", function (d) { if (shown(d)) d3.select(this).style("opacity", null); });
+          labs.forEach(function (l) { l[0].transition("f").duration(t).style("opacity", shown(l[1]) && view === "dove" ? 1 : 0); });
+        } else {
+          dots.style("opacity", function (d) { return shown(d) ? null : 0; });
+          labs.forEach(function (l) { l[0].style("opacity", shown(l[1]) && view === "dove" ? 1 : 0); });
+        }
+        var vis = data.filter(shown);
+        del = { pts: vis, d: d3.Delaunay.from(vis, function (d) { return d.x; }, function (d) { return d.y; }) };
+      };
+      paint(false);
+
+      // interazione: il cerchio più vicino al puntatore (anche i più piccoli si toccano bene)
+      clear = function () { dots.classed("is-dimmed", false).style("stroke-width", null); paint(false); };
+      function pick(ev) {
+        var p = d3.pointer(ev, svg.node());
+        if (!del.pts.length) return;
+        var d = del.pts[del.d.find(p[0], p[1])];
+        if (Math.hypot(p[0] - d.x, p[1] - d.y) > Math.max(rad(d), 22)) {
+          var inside = sorted.slice().reverse().find(function (q) { return shown(q) && Math.hypot(p[0] - q.x, p[1] - q.y) <= rad(q); });
+          if (!inside) { tip.hide(); clear(); return; }
+          d = inside;
+        }
+        dots.classed("is-dimmed", function (q) { return q !== d; }).style("stroke", strokeOf).style("stroke-width", null);
+        dots.filter(function (q) { return q === d; }).style("stroke", "var(--ink)").style("stroke-width", 1.5).raise();
+        var html;
+        if (view === "dove") {
+          html = R.tipHTML({
+            title: d.nome, value: d.terra == null ? "n.d." : f0(d.terra), unit: d.terra == null ? "" : "ettari a terra",
+            rows: [["Regione", d.regione], ["Area a mare", d.mare ? f0(d.mare) + " ha" : "–"], ["Istituito", d.anno], ["Attività", d.att]],
+            note: d.origine + ". <b>Inquinanti:</b> " + d.inq + (d.terra == null ? ". Perimetrata nel luglio 2025" : "")
+          });
+        } else {
+          var m = d.b[mat];
+          html = R.tipHTML({
+            title: d.nome, value: has(d) ? fmt(m.concl, 1) + "%" : "n.d.", unit: has(d) ? "con iter concluso" : "",
+            rows: has(d) ? [["Analisi completate", fmt(m.car, 1) + "%"], ["Progetto approvato", fmt(m.prog, 1) + "%"], ["Ettari a terra", d.terra == null ? "n.d." : f0(d.terra)]] : [],
+            note: d.b.nota || null
+          });
+        }
+        tip.show(html, d.x, d.y - rad(d));
+      }
+      svg.on("pointermove pointerdown", pick)
+        .on("pointerleave", function (ev) { if (ev.pointerType === "mouse") { tip.hide(); clear(); } });
+    });
+  }).catch(function (e) { R.fail("#map", e); });
+})();
+</script>
+</body>
+</html>
