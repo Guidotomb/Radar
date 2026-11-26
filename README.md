@@ -8,6 +8,9 @@ Indice con anteprime e snippet: https://guidotomb.github.io/Radar/
 
 | Dataviz | URL | Dati | Fonte | Note |
 |---|---|---|---|---|
+| La guerra in Ucraina arriva in Libia, tra le basi delle potenze straniere | https://guidotomb.github.io/Radar/libia-mappa/ | `data/libia-luoghi.csv, data/libia-confini.json` | Reuters; Panel di esperti Onu sulla Libia (S/2026/224); Nga e Tearline; Congresso Usa; Asharq Al-Awsat; Agenzia Nova; confini Natural Earth | Aree di controllo indicative (sfumate dove il controllo è incerto); linea del fronte a ovest di Sirte. Posizioni in mare di Angara e Arctic Metagaz indicative. Presenza ucraina secondo fonti della sicurezza libica (Reuters). Distanza Bengasi–Siracusa calcolata. |
+| In 755 comuni italiani Bengasi è più vicina di Milano | https://guidotomb.github.io/Radar/libia-distanze/ | `data/libia-distanze-comuni.csv, data/libia-confini.json` | Istat, confini dei comuni al 1° gennaio 2026; Natural Earth | Distanze in linea d'aria (sfera, raggio 6.371 km) dal centroide geometrico di ogni comune al porto di Bengasi (32,11 N; 20,06 E): calcolo Radar. Milano e Roma: centroidi dei due comuni. Il numero nel titolo è calcolato dal CSV. |
+| Migranti, gas e soldati: gli interessi italiani in Libia passano da Tripoli | https://guidotomb.github.io/Radar/libia-italia/ | `data/libia-italia.csv` | Unhcr, Agi, Ice, ItaliaOggi, Eni, Agenzia Nova, Euronews | Interscambio gennaio-aprile 2025 ricavato dalla crescita del 29,5% del 2026 (ItaliaOggi). Quota Libia sugli arrivi: Unhcr, primi otto mesi 2026. |
 | I 42 siti contaminati di interesse nazionale in Italia | https://guidotomb.github.io/Radar/sin-mappa/ | `data/sin-siti.csv, data/sin-bonifiche.csv, data/sin-regioni.geojson` | Ispra su dati del ministero dell'Ambiente (giugno 2024); Legambiente; Regioni e Arpa | Attività prevalente: elaborazione Radar. Stato delle bonifiche: quota di superficie con procedimento concluso (Ispra, Tabella 3); per alcuni siti riferita a una parte dell'area. Giugliano senza superficie nei dati 2024. |
 | Caffaro, il sito inquinato di Brescia in numeri | https://guidotomb.github.io/Radar/sin-caffaro/ | `data/sin-caffaro-numeri.csv, data/sin-caffaro-suolo.csv, data/sin-caffaro-timeline.csv` | Legambiente su dati del ministero dell'Ambiente (giugno 2024); Comune di Brescia; Ats Brescia; Il Giorno | Waffle: 262 ettari di suolo per stato del procedimento (MASE, giugno 2024). Cronologia da Legambiente, Comune di Brescia e Ats. |
 | Meno bar, più ristoranti: come cambia l'Italia | https://guidotomb.github.io/Radar/bar-ristoranti/ | `data/bar-ristoranti.csv` | FIPE–Centro Studi Tagliacarne, *Pubblici esercizi e movida*, giugno 2026, p. 7 | Il dato 2025 si riferisce al primo semestre. |
@@ -29,6 +32,33 @@ Ogni pagina legge il proprio CSV da `data/` (separatore `;`, virgola decimale, U
 ## Snippet per il CMS
 
 Lo script va incollato inline (mai richiamato da un file esterno). Se in un articolo ci sono più dataviz, può restare in ognuna: si attiva una volta sola.
+
+### La guerra in Ucraina arriva in Libia, tra le basi delle potenze straniere
+
+```html
+<iframe src="https://guidotomb.github.io/Radar/libia-mappa/" width="100%" height="1180" frameborder="0" scrolling="no" title="La guerra in Ucraina arriva in Libia, tra le basi delle potenze straniere"></iframe>
+<script>
+(function(){if(window.__radarQNv2)return;window.__radarQNv2=1;var O="https://guidotomb.github.io";var MQ=window.matchMedia("(prefers-color-scheme:dark)");function frames(){return Array.prototype.filter.call(document.getElementsByTagName("iframe"),function(f){return(f.getAttribute("src")||"").indexOf(O+"/")===0;});}function theme(){var t=document.documentElement.getAttribute("data-theme");return t==="dark"||t==="light"?t:(MQ.matches?"dark":"light");}function bgOf(el){for(;el&&el.nodeType===1;el=el.parentElement){var c=getComputedStyle(el).backgroundColor;if(c&&c !=="transparent"&&!/rgba\([^)]*,\s*0\)$/.test(c))return c;}return null;}function send(f){try{f.contentWindow.postMessage({sentinel:"radar-qn",type:"theme",theme:theme(),bg:bgOf(f.parentElement)},O);}catch(e){}}function sendAll(){frames().forEach(send);}window.addEventListener("message",function(e){if(e.origin !==O)return;var d=e.data;if(!d||d.sentinel !=="radar-qn"||d.type !=="height")return;frames().forEach(function(f){if(f.contentWindow !==e.source)return;var h=Math.ceil(+d.height);if(h > 0&&20000 > h)f.style.height=h+"px";send(f);});});new MutationObserver(function(){sendAll();setTimeout(sendAll,400);}).observe(document.documentElement,{attributes:true,attributeFilter:["data-theme"]});if(MQ.addEventListener)MQ.addEventListener("change",sendAll);})();
+</script>
+```
+
+### In 755 comuni italiani Bengasi è più vicina di Milano
+
+```html
+<iframe src="https://guidotomb.github.io/Radar/libia-distanze/" width="100%" height="870" frameborder="0" scrolling="no" title="In 755 comuni italiani Bengasi è più vicina di Milano"></iframe>
+<script>
+(function(){if(window.__radarQNv2)return;window.__radarQNv2=1;var O="https://guidotomb.github.io";var MQ=window.matchMedia("(prefers-color-scheme:dark)");function frames(){return Array.prototype.filter.call(document.getElementsByTagName("iframe"),function(f){return(f.getAttribute("src")||"").indexOf(O+"/")===0;});}function theme(){var t=document.documentElement.getAttribute("data-theme");return t==="dark"||t==="light"?t:(MQ.matches?"dark":"light");}function bgOf(el){for(;el&&el.nodeType===1;el=el.parentElement){var c=getComputedStyle(el).backgroundColor;if(c&&c !=="transparent"&&!/rgba\([^)]*,\s*0\)$/.test(c))return c;}return null;}function send(f){try{f.contentWindow.postMessage({sentinel:"radar-qn",type:"theme",theme:theme(),bg:bgOf(f.parentElement)},O);}catch(e){}}function sendAll(){frames().forEach(send);}window.addEventListener("message",function(e){if(e.origin !==O)return;var d=e.data;if(!d||d.sentinel !=="radar-qn"||d.type !=="height")return;frames().forEach(function(f){if(f.contentWindow !==e.source)return;var h=Math.ceil(+d.height);if(h > 0&&20000 > h)f.style.height=h+"px";send(f);});});new MutationObserver(function(){sendAll();setTimeout(sendAll,400);}).observe(document.documentElement,{attributes:true,attributeFilter:["data-theme"]});if(MQ.addEventListener)MQ.addEventListener("change",sendAll);})();
+</script>
+```
+
+### Migranti, gas e soldati: gli interessi italiani in Libia passano da Tripoli
+
+```html
+<iframe src="https://guidotomb.github.io/Radar/libia-italia/" width="100%" height="600" frameborder="0" scrolling="no" title="Migranti, gas e soldati: gli interessi italiani in Libia passano da Tripoli"></iframe>
+<script>
+(function(){if(window.__radarQNv2)return;window.__radarQNv2=1;var O="https://guidotomb.github.io";var MQ=window.matchMedia("(prefers-color-scheme:dark)");function frames(){return Array.prototype.filter.call(document.getElementsByTagName("iframe"),function(f){return(f.getAttribute("src")||"").indexOf(O+"/")===0;});}function theme(){var t=document.documentElement.getAttribute("data-theme");return t==="dark"||t==="light"?t:(MQ.matches?"dark":"light");}function bgOf(el){for(;el&&el.nodeType===1;el=el.parentElement){var c=getComputedStyle(el).backgroundColor;if(c&&c !=="transparent"&&!/rgba\([^)]*,\s*0\)$/.test(c))return c;}return null;}function send(f){try{f.contentWindow.postMessage({sentinel:"radar-qn",type:"theme",theme:theme(),bg:bgOf(f.parentElement)},O);}catch(e){}}function sendAll(){frames().forEach(send);}window.addEventListener("message",function(e){if(e.origin !==O)return;var d=e.data;if(!d||d.sentinel !=="radar-qn"||d.type !=="height")return;frames().forEach(function(f){if(f.contentWindow !==e.source)return;var h=Math.ceil(+d.height);if(h > 0&&20000 > h)f.style.height=h+"px";send(f);});});new MutationObserver(function(){sendAll();setTimeout(sendAll,400);}).observe(document.documentElement,{attributes:true,attributeFilter:["data-theme"]});if(MQ.addEventListener)MQ.addEventListener("change",sendAll);})();
+</script>
+```
 
 ### Meno bar, più ristoranti: come cambia l'Italia
 

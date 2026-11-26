@@ -1,0 +1,253 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Quanto è lontana Bengasi dal tuo comune – Radar QN</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Libre+Franklin:wght@400;500;600;700&family=Newsreader:opsz,wght@6..72,400;6..72,700&display=swap">
+<link rel="stylesheet" href="../assets/radar.css">
+<script src="https://cdn.jsdelivr.net/npm/d3@7"></script>
+<script src="../assets/radar.js"></script>
+<style>
+  :root { --land: #e6e7e9; --border: #f7f8f9; }
+  :root[data-theme="dark"] { --land: #222426; --border: #121212; }
+  .search { position: relative; margin: 22px 0 0; max-width: 360px; }
+  .search input {
+    width: 100%; font: 400 16px/1.2 var(--sans); color: var(--ink); background: var(--tip-bg);
+    border: 1px solid var(--rule); border-radius: 4px; padding: 10px 12px 10px 34px; min-height: 44px;
+  }
+  .search input:focus-visible { outline: 2px solid var(--blue); outline-offset: 1px; }
+  .search svg.ico { position: absolute; left: 11px; top: 14px; color: var(--ink-2); }
+  .sugg { position: absolute; z-index: 6; left: 0; right: 0; top: calc(100% + 4px); margin: 0; padding: 4px 0; list-style: none;
+    background: var(--tip-bg); border: 1px solid var(--rule); border-radius: 4px; display: none; }
+  .sugg.is-on { display: block; }
+  .sugg li { padding: 8px 12px; font-size: 14px; cursor: pointer; display: flex; justify-content: space-between; gap: 12px; }
+  .sugg li small { color: var(--ink-2); }
+  .sugg li[aria-selected="true"], .sugg li:hover { background: var(--rule); }
+  .grid { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr); gap: 24px; margin-top: 18px; align-items: start; }
+  @media (max-width: 599px) { .grid { grid-template-columns: minmax(0, 1fr); } }
+  .map { position: relative; }
+  .map svg { display: block; overflow: visible; }
+  .land { fill: var(--land); }
+  .borders { fill: none; stroke: var(--border); stroke-width: 1; }
+  .line-b { fill: none; stroke: var(--red); stroke-width: 1.6; }
+  .line-m { fill: none; stroke: var(--ink-2); stroke-width: 1; stroke-dasharray: 3 3; }
+  .lbl { font-size: 12px; font-weight: 600; fill: var(--ink); paint-order: stroke; stroke: var(--bg); stroke-width: 3.5px; stroke-linejoin: round; pointer-events: none; }
+  .lbl-c { font-size: 12px; fill: var(--ink-2); pointer-events: none; }
+  .res .r-big { margin-top: 0; }
+  .res .r-big__num { color: var(--red); }
+  .res h2 { font: 700 15px/1.3 var(--sans); margin: 0 0 10px; }
+  .cmp { margin: 14px 0 0; }
+  .cmp__row { display: grid; grid-template-columns: 64px minmax(0, 1fr) 72px; align-items: center; gap: 8px; font-size: 13px; margin: 6px 0; }
+  .cmp__row b { font-weight: 600; }
+  .cmp__bar { height: 12px; border-radius: 0 2px 2px 0; background: var(--grey-4); transition: width 400ms ease; }
+  .cmp__row.is-b .cmp__bar { background: var(--red); }
+  .cmp__v { text-align: right; font-variant-numeric: tabular-nums; font-weight: 600; white-space: nowrap; }
+  .verdict { font-size: 14px; line-height: 1.45; margin: 12px 0 0; }
+  .rank { margin-top: 22px; }
+  .rank h3 { font: 600 14px/1.3 var(--sans); margin: 0 0 6px; }
+  .rank button { all: unset; box-sizing: border-box; cursor: pointer; display: grid; grid-template-columns: minmax(0, 1fr) 64px; gap: 8px; width: 100%; font-size: 13px; padding: 4px 0; min-height: 28px; align-items: center; }
+  .rank button:focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; }
+  .rank button span:last-child { text-align: right; font-variant-numeric: tabular-nums; font-weight: 600; }
+  .rank .bar { display: none; height: 6px; background: var(--red-4); border-radius: 0 2px 2px 0; margin-top: 3px; }
+  .rank button > span:first-child { display: block; }
+</style>
+</head>
+<body>
+<main class="radar">
+  <header>
+    <h1 class="r-title">In <span id="t-n" style="display:inline">755</span> comuni italiani Bengasi è più vicina di Milano</h1>
+    <p class="r-sub">Distanza in linea d'aria tra ogni comune e il porto di Bengasi, dove il 22 novembre droni ucraini hanno colpito la corvetta russa Merkury. Cerca il tuo comune o passa sulla mappa</p>
+  </header>
+
+  <div class="search">
+    <svg class="ico" width="15" height="15" viewBox="0 0 16 16" aria-hidden="true"><circle cx="7" cy="7" r="5.2" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M11 11l3.6 3.6" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+    <input id="q" type="search" autocomplete="off" placeholder="Il tuo comune, per esempio Catania" aria-label="Cerca un comune" role="combobox" aria-expanded="false" aria-controls="sugg">
+    <ul class="sugg" id="sugg" role="listbox"></ul>
+  </div>
+
+  <div class="grid">
+    <figure class="r-chart map" id="map" style="margin:0"></figure>
+    <section class="res" id="res" aria-live="polite">
+      <div class="r-big">
+        <span class="r-big__num"><span id="b-num">–</span><span class="r-big__unit"> km</span></span>
+        <span class="r-big__label" id="b-label"></span>
+      </div>
+      <div class="cmp" id="cmp"></div>
+      <p class="verdict" id="verdict"></p>
+      <div class="rank">
+        <h3>I comuni più vicini a Bengasi</h3>
+        <div id="rank"></div>
+      </div>
+    </section>
+  </div>
+
+  <div class="r-key">
+    <span><svg width="10" height="10" aria-hidden="true"><circle cx="5" cy="5" r="3.5" style="fill:var(--red-3)"></circle></svg>Bengasi più vicina di Milano</span>
+    <span><svg width="10" height="10" aria-hidden="true"><circle cx="5" cy="5" r="3.5" style="fill:var(--grey-4)"></circle></svg>Milano più vicina</span>
+  </div>
+  <p class="r-note">Distanze calcolate dal centro geometrico di ogni comune. Comuni al 1° gennaio 2026.</p>
+
+  <footer class="r-foot">
+    <span>Fonte: Istat, confini dei comuni al 1° gennaio 2026; Natural Earth</span>
+    <span>Elaborazione Radar – QN</span>
+  </footer>
+</main>
+
+<script>
+(function () {
+  var R = Radar, fmt = R.fmt;
+  var BASE = "../data/";
+  var BENGASI = [20.06, 32.11];
+  var START = "089017";   // Siracusa
+  var BOX = { type: "MultiPoint", coordinates: [[6.6, 31.3], [21.4, 31.3], [21.4, 47.1], [6.6, 47.1]] };
+
+  function esc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]; }); }
+  function norm(s) { return String(s).toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[^a-z0-9]+/g, " ").trim(); }
+
+  Promise.all([R.loadCSV(BASE + "libia-distanze-comuni.csv"), fetch(BASE + "libia-confini.json").then(function (r) { return r.json(); })]).then(function (res) {
+    var com = res[0].map(function (r) {
+      var o = { cod: r.codice, nome: r.comune, alt: r.altra_denominazione, prov: r.provincia, reg: r.regione,
+        c: [R.num(r.lon), R.num(r.lat)], kb: R.num(r.km_bengasi), km: R.num(r.km_milano), kr: R.num(r.km_roma) };
+      o.closer = o.kb < o.km; o.key = norm(o.nome + " " + o.alt);
+      return o;
+    });
+    var byCod = {}; com.forEach(function (d) { byCod[d.cod] = d; });
+    var nCloser = com.filter(function (d) { return d.closer; }).length;
+    d3.select("#t-n").text(fmt(nCloser));
+    var base = res[1];
+    var land = base.land;
+
+    var sel = byCod[START] || com[0];
+    var host = document.getElementById("map");
+    var tip = R.tooltip(host);
+    var proj, gSel, svg, delaunay, W = 0;
+
+    // ---- risultato a destra ----
+    function showResult(d) {
+      d3.select("#b-num").text(fmt(d.kb));
+      d3.select("#b-label").text("da " + d.nome + " (" + d.prov + ") al porto di Bengasi, in linea d'aria");
+      var rows = [["Bengasi", d.kb, true], ["Milano", d.km, false], ["Roma", d.kr, false]];
+      var mx = d3.max(rows, function (r) { return r[1]; }) || 1;
+      var cmp = d3.select("#cmp").selectAll(".cmp__row").data(rows).join(function (e) {
+        var row = e.append("div").attr("class", "cmp__row");
+        row.append("b"); row.append("div").append("div").attr("class", "cmp__bar"); row.append("span").attr("class", "cmp__v");
+        return row;
+      });
+      cmp.classed("is-b", function (r) { return r[2]; });
+      cmp.select("b").text(function (r) { return r[0]; });
+      cmp.select(".cmp__bar").style("width", function (r) { return Math.max(1, r[1] / mx * 100) + "%"; });
+      cmp.select(".cmp__v").text(function (r) { return d.cod === "015146" && r[0] === "Milano" || d.cod === "058091" && r[0] === "Roma" ? "–" : fmt(r[1]) + " km"; });
+      var v;
+      if (d.closer) v = "Da " + d.nome + " Bengasi è più vicina di Milano: " + fmt(d.km - d.kb) + " km in meno.";
+      else v = "Da " + d.nome + " Bengasi è più lontana di Milano di " + fmt(d.kb - d.km) + " km.";
+      d3.select("#verdict").text(v);
+    }
+
+    // ---- classifica ----
+    var top = com.slice().sort(function (a, b) { return a.kb - b.kb; }).slice(0, 5);
+    var tmax = d3.max(top, function (d) { return d.kb; });
+    var rk = d3.select("#rank").selectAll("button").data(top).join("button").attr("type", "button")
+      .on("click", function (ev, d) { select(d); });
+    rk.append("span").html(function (d) { return esc(d.nome) + " <small style='color:var(--ink-2)'>" + esc(d.prov) + "</small><span class='bar' style='width:" + (d.kb / tmax * 100) + "%'></span>"; });
+    rk.append("span").text(function (d) { return fmt(d.kb) + " km"; });
+
+    // ---- mappa ----
+    function drawSel(phase) {
+      if (!gSel) return;
+      gSel.selectAll("*").remove();
+      var p = proj(sel.c), b = proj(BENGASI);
+      var lineB = gSel.append("path").datum({ type: "LineString", coordinates: [sel.c, BENGASI] }).attr("class", "line-b").attr("d", d3.geoPath(proj));
+      if (phase !== "static" && !R.reduced) {
+        var L = lineB.node().getTotalLength();
+        lineB.attr("stroke-dasharray", L + " " + L).attr("stroke-dashoffset", L).transition().duration(R.DUR).ease(R.EASE).attr("stroke-dashoffset", 0);
+      }
+      gSel.append("circle").attr("cx", p[0]).attr("cy", p[1]).attr("r", 5).style("fill", "var(--red)").style("stroke", "var(--bg)").style("stroke-width", 1.5);
+      var right = p[0] < W * 0.6;
+      gSel.append("text").attr("class", "lbl").attr("x", p[0] + (right ? 8 : -8)).attr("y", p[1] - 6).attr("text-anchor", right ? "start" : "end").text(sel.nome);
+      var mid = proj(d3.geoInterpolate(sel.c, BENGASI)(0.5));
+      gSel.append("text").attr("class", "lbl").attr("x", mid[0] + 8).attr("y", mid[1]).text(fmt(sel.kb) + " km");
+    }
+
+    function draw(w, phase) {
+      W = w;
+      proj = d3.geoMercator().fitWidth(w, BOX);
+      var path = d3.geoPath(proj);
+      var bb = path.bounds(BOX), H = Math.ceil(bb[1][1] - bb[0][1]);
+      proj.clipExtent([[0, 0], [w, H]]);
+      d3.select(host).selectAll("svg").remove();
+      svg = d3.select(host).append("svg").attr("width", w).attr("height", H).attr("role", "img")
+        .attr("aria-label", "Mappa dei comuni italiani: in " + fmt(nCloser) + " comuni, tutti nel Sud, il porto di Bengasi è più vicino di Milano.");
+      svg.append("path").datum(land).attr("class", "land").attr("d", path);
+      svg.append("path").datum(base.borders).attr("class", "borders").attr("d", path);
+      var xy = com.map(function (d) { return proj(d.c); });
+      var g = svg.append("g");
+      g.selectAll("circle").data(com).join("circle")
+        .attr("cx", function (d, i) { return xy[i][0]; }).attr("cy", function (d, i) { return xy[i][1]; })
+        .attr("r", w < 400 ? 0.8 : 1.05)
+        .style("fill", function (d) { return d.closer ? "var(--red-3)" : "var(--grey-4)"; });
+      // Bengasi
+      var bp = proj(BENGASI);
+      svg.append("rect").attr("x", bp[0] - 4.5).attr("y", bp[1] - 4.5).attr("width", 9).attr("height", 9).style("fill", "var(--ink)");
+      svg.append("text").attr("class", "lbl").attr("x", bp[0] - 8).attr("y", bp[1] + 18).attr("text-anchor", "end").text("Bengasi");
+      var lp = proj([17.2, 33.3]);
+      svg.append("text").attr("class", "lbl-c").attr("x", lp[0]).attr("y", lp[1]).attr("text-anchor", "middle").style("font-style", "italic").text("Mar Mediterraneo");
+      var lb = proj([13.2, 32.15]);
+      svg.append("text").attr("class", "lbl-c").attr("x", lb[0]).attr("y", lb[1]).attr("text-anchor", "middle").text("Libia");
+      gSel = svg.append("g");
+      drawSel(phase);
+      // interazione: punto più vicino
+      delaunay = d3.Delaunay.from(xy);
+      svg.append("rect").attr("width", w).attr("height", H).style("fill", "transparent")
+        .on("pointermove", function (ev) {
+          var m = d3.pointer(ev), i = delaunay.find(m[0], m[1]), d = com[i];
+          if (Math.hypot(xy[i][0] - m[0], xy[i][1] - m[1]) > 14) { tip.hide(); return; }
+          tip.show(R.tipHTML({ title: esc(d.nome) + " (" + esc(d.prov) + ")", value: fmt(d.kb), unit: "km da Bengasi",
+            rows: [["Milano", fmt(d.km) + " km"], ["Roma", fmt(d.kr) + " km"]], note: "Tocca o clicca per selezionarlo" }), xy[i][0], xy[i][1]);
+        })
+        .on("pointerleave", function () { tip.hide(); })
+        .on("click", function (ev) {
+          var m = d3.pointer(ev), i = delaunay.find(m[0], m[1]);
+          if (Math.hypot(xy[i][0] - m[0], xy[i][1] - m[1]) <= 14) select(com[i]);
+        });
+    }
+
+    function select(d) {
+      sel = d; showResult(d); drawSel("play"); tip.hide();
+      input.node().value = "";
+    }
+
+    // ---- ricerca ----
+    var input = d3.select("#q"), list = d3.select("#sugg"), hits = [], cur = -1;
+    function close() { list.classed("is-on", false); input.attr("aria-expanded", "false"); cur = -1; }
+    function render() {
+      list.selectAll("li").data(hits).join("li").attr("role", "option").attr("id", function (d, i) { return "opt" + i; })
+        .attr("aria-selected", function (d, i) { return i === cur ? "true" : "false"; })
+        .html(function (d) { return "<span>" + esc(d.nome) + "</span><small>" + esc(d.prov) + " · " + fmt(d.kb) + " km</small>"; })
+        .on("pointerdown", function (ev, d) { ev.preventDefault(); select(d); close(); });
+      list.classed("is-on", hits.length > 0); input.attr("aria-expanded", hits.length > 0 ? "true" : "false");
+    }
+    input.on("input", function () {
+      var q = norm(this.value); cur = -1;
+      if (q.length < 2) { hits = []; render(); return; }
+      var starts = [], inside = [];
+      com.forEach(function (d) { var i = d.key.indexOf(q); if (i === 0) starts.push(d); else if (i > 0) inside.push(d); });
+      hits = starts.sort(function (a, b) { return a.nome.length - b.nome.length; }).concat(inside).slice(0, 8);
+      render();
+    }).on("keydown", function (ev) {
+      if (ev.key === "ArrowDown") { cur = Math.min(hits.length - 1, cur + 1); render(); ev.preventDefault(); }
+      else if (ev.key === "ArrowUp") { cur = Math.max(0, cur - 1); render(); ev.preventDefault(); }
+      else if (ev.key === "Enter") { var d = hits[cur >= 0 ? cur : 0]; if (d) { select(d); close(); } ev.preventDefault(); }
+      else if (ev.key === "Escape") close();
+    }).on("blur", function () { setTimeout(close, 120); });
+
+    showResult(sel);
+    R.dismissOutside(host, function () { tip.hide(); });
+    R.responsive(host, draw);
+  }).catch(function (e) { R.fail(document.getElementById("map"), e); });
+})();
+</script>
+</body>
+</html>

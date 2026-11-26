@@ -1,0 +1,132 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Gli interessi italiani in Libia – Radar QN</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Libre+Franklin:wght@400;500;600;700&family=Newsreader:opsz,wght@6..72,400;6..72,700&display=swap">
+<link rel="stylesheet" href="../assets/radar.css">
+<script src="https://cdn.jsdelivr.net/npm/d3@7"></script>
+<script src="../assets/radar.js"></script>
+<style>
+  .tabs { display: flex; flex-wrap: wrap; gap: 6px; margin: 22px 0 0; }
+  .tab { font: 500 13px/1 var(--sans); color: var(--ink); background: transparent; border: 1px solid var(--rule);
+    border-radius: 999px; padding: 9px 14px; min-height: 36px; cursor: pointer; }
+  .tab[aria-selected="true"] { background: var(--ink); color: var(--bg); border-color: var(--ink); font-weight: 600; }
+  .tab:focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; }
+  .panel { margin-top: 18px; min-height: 330px; }
+  .panel .r-big { margin-top: 6px; }
+  .panel .r-big__num { color: var(--blue); }
+  .panel .r-big__label { max-width: 440px; }
+  .rows { margin: 20px 0 0; padding: 0; list-style: none; border-top: 1px solid var(--rule); }
+  .rows li { display: grid; grid-template-columns: 150px minmax(0, 1fr); gap: 4px 16px; padding: 11px 0; border-bottom: 1px solid var(--rule); font-size: 14px; line-height: 1.45; }
+  .rows li b { font-weight: 700; font-variant-numeric: tabular-nums; }
+  .rows li small { display: block; color: var(--ink-2); font-size: 12px; margin-top: 2px; }
+  @media (max-width: 519px) { .rows li { grid-template-columns: minmax(0, 1fr); } }
+  .bars { margin: 18px 0 0; }
+  .bars__row { display: grid; grid-template-columns: 96px minmax(0, 1fr) 96px; gap: 10px; align-items: center; font-size: 13px; margin: 7px 0; }
+  .bars__bar { height: 16px; border-radius: 0 2px 2px 0; background: var(--grey-4); }
+  .bars__row.is-hi .bars__bar { background: var(--blue); }
+  .bars__v { font-weight: 600; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .quota { display: flex; height: 22px; margin: 18px 0 6px; gap: 2px; }
+  .quota div { height: 100%; }
+  .quota div:first-child { background: var(--blue); border-radius: 2px 0 0 2px; }
+  .quota div:last-child { background: var(--grey-4); border-radius: 0 2px 2px 0; }
+  .quota-lbl { display: flex; justify-content: space-between; font-size: 12px; color: var(--ink-2); }
+  .quota-lbl b { color: var(--ink); }
+  .src { font-size: 12px; color: var(--ink-2); margin: 12px 0 0; }
+</style>
+</head>
+<body>
+<main class="radar">
+  <header>
+    <h1 class="r-title">Migranti, gas e soldati: gli interessi italiani in Libia passano da Tripoli</h1>
+    <p class="r-sub">Perché quello che succede in Libia riguarda da vicino l'Italia. Scegli un tema</p>
+  </header>
+
+  <div class="tabs" role="tablist" aria-label="Temi" id="tabs"></div>
+  <section class="panel" id="panel" role="tabpanel" aria-live="polite"></section>
+
+  <footer class="r-foot">
+    <span id="foot">Fonte: Unhcr, Agi, Ice, ItaliaOggi, Eni, Agenzia Nova, Euronews</span>
+    <span>Elaborazione Radar – QN</span>
+  </footer>
+</main>
+
+<script>
+(function () {
+  var R = Radar, fmt = R.fmt;
+  var TEMI = [["migranti", "Migranti"], ["commercio", "Commercio"], ["energia", "Energia"], ["difesa", "Difesa"]];
+  function esc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]; }); }
+
+  R.loadCSV("../data/libia-italia.csv").then(function (data) {
+    var panel = d3.select("#panel");
+    var tabs = d3.select("#tabs").selectAll("button").data(TEMI).join("button")
+      .attr("class", "tab").attr("role", "tab").attr("type", "button").attr("id", function (d) { return "tab-" + d[0]; })
+      .text(function (d) { return d[1]; })
+      .on("click", function (ev, d) { show(d[0], true); })
+      .on("keydown", function (ev, d) {
+        var i = TEMI.indexOf(d);
+        if (ev.key === "ArrowRight" || ev.key === "ArrowLeft") {
+          var n = TEMI[(i + (ev.key === "ArrowRight" ? 1 : TEMI.length - 1)) % TEMI.length];
+          show(n[0], true); document.getElementById("tab-" + n[0]).focus(); ev.preventDefault();
+        }
+      });
+
+    function show(tema, animate) {
+      tabs.attr("aria-selected", function (d) { return d[0] === tema ? "true" : "false"; }).attr("tabindex", function (d) { return d[0] === tema ? 0 : -1; });
+      var rows = data.filter(function (r) { return r.tema === tema; });
+      var big = rows.filter(function (r) { return r.tipo === "big"; })[0];
+      panel.html("");
+      var bigEl = panel.append("div").attr("class", "r-big");
+      var num = bigEl.append("span").attr("class", "r-big__num");
+      var raw = big.valore, n = R.num(raw.replace(/[^\d.,]/g, "")), suffix = raw.replace(/^[\d.,]+/, "");
+      var numTxt = num.append("span");
+      if (n != null && animate && !R.reduced) R.countUp(numTxt, n, function (v) { return fmt(v) + suffix; }, "play");
+      else numTxt.text(raw);
+      if (big.unita && !/%|°/.test(suffix)) num.append("span").attr("class", "r-big__unit").text(" " + big.unita);
+      bigEl.append("span").attr("class", "r-big__label").text(big.testo);
+
+      var bars = rows.filter(function (r) { return r.tipo === "barra"; });
+      if (bars.length) {
+        var mx = d3.max(bars, function (b) { return R.num(b.valore); });
+        var br = panel.append("div").attr("class", "bars").attr("role", "img")
+          .attr("aria-label", bars.map(function (b) { return b.etichetta + ": " + b.valore + " " + b.unita; }).join("; "));
+        bars.forEach(function (b, i) {
+          var row = br.append("div").attr("class", "bars__row" + (i === bars.length - 1 ? " is-hi" : ""));
+          row.append("span").text(b.etichetta);
+          var bar = row.append("div").append("div").attr("class", "bars__bar");
+          R.enter(bar, animate ? "play" : "static", function (s) { s.style("width", "0%"); }, function (s) { s.style("width", R.num(b.valore) / mx * 100 + "%"); });
+          row.append("span").attr("class", "bars__v").text(fmt(R.num(b.valore), 2) + " mld €");
+        });
+        panel.append("p").attr("class", "src").text("Interscambio Italia-Libia. Il valore 2025 è ricavato dalla crescita del 29,5% indicata per il 2026.");
+      }
+      var q = rows.filter(function (r) { return r.tipo === "quota"; });
+      if (q.length) {
+        var qb = panel.append("div").attr("class", "quota").attr("role", "img")
+          .attr("aria-label", q.map(function (r) { return r.etichetta + " " + r.valore + "%"; }).join(", "));
+        q.forEach(function (r) {
+          var d = qb.append("div");
+          R.enter(d, animate ? "play" : "static", function (s) { s.style("width", "0%"); }, function (s) { s.style("width", R.num(r.valore) + "%"); });
+        });
+        panel.append("div").attr("class", "quota-lbl").html(q.map(function (r) { return "<span><b>" + esc(r.etichetta) + "</b> " + fmt(R.num(r.valore)) + "%</span>"; }).join(""));
+      }
+      var list = panel.append("ul").attr("class", "rows");
+      rows.filter(function (r) { return r.tipo === "riga"; }).forEach(function (r) {
+        var li = list.append("li");
+        li.append("b").text(r.etichetta);
+        li.append("span").html(esc(r.testo) + "<small>Fonte: " + esc(r.fonte) + "</small>");
+      });
+      panel.append("p").attr("class", "src").text("Dato principale: " + big.fonte);
+      R.scheduleHeight();
+    }
+
+    show(TEMI[0][0], false);
+    R.onFirstView(document.getElementById("panel"), function () { show(TEMI[0][0], true); });
+  }).catch(function (e) { R.fail(document.getElementById("panel"), e); });
+})();
+</script>
+</body>
+</html>

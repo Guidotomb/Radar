@@ -1,0 +1,341 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Libia, gli attacchi ucraini e le basi straniere – Radar QN</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Libre+Franklin:wght@400;500;600;700&family=Newsreader:opsz,wght@6..72,400;6..72,700&display=swap">
+<link rel="stylesheet" href="../assets/radar.css">
+<script src="https://cdn.jsdelivr.net/npm/d3@7"></script>
+<script src="../assets/radar.js"></script>
+<style>
+  :root { --land: #e9eaec; --ctrl-w: #dcebfa; --ctrl-e: #8fc4f6; --border: #f7f8f9; }
+  :root[data-theme="dark"] { --land: #222426; --ctrl-w: #1b2a3d; --ctrl-e: #26508f; --border: #121212; }
+  .r-pills { display: flex; flex-wrap: wrap; gap: 6px; margin: 20px 0 0; }
+  .r-pill {
+    font: 500 13px/1 var(--sans); color: var(--ink); background: transparent;
+    border: 1px solid var(--rule); border-radius: 999px; padding: 7px 11px 7px 9px;
+    display: inline-flex; align-items: center; gap: 7px; cursor: pointer; min-height: 32px;
+  }
+  .r-pill[aria-pressed="true"] { border-color: var(--ink); font-weight: 600; }
+  .r-pill:focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; }
+  .r-pill svg { display: block; overflow: visible; }
+  .map-wrap { position: relative; margin-top: 14px; }
+  .land { fill: var(--land); }
+  .libya { fill: var(--ctrl-w); }
+  .ctrl-e { fill: var(--ctrl-e); }
+  .ctrl-hit { fill: transparent; cursor: pointer; }
+  .front { fill: none; stroke: var(--ink); stroke-width: 1.5; stroke-dasharray: 4 2.5; }
+  .lbl-ctrl { font-size: 13px; font-weight: 700; fill: var(--ink); paint-order: stroke; stroke-width: 3.5px; stroke-linejoin: round; }
+  .r-grad { display: inline-block; width: 92px; height: 10px; border-radius: 2px; background: linear-gradient(90deg, var(--ctrl-w), var(--ctrl-w) 18%, var(--ctrl-e) 82%, var(--ctrl-e)); flex: none; }
+  .borders { fill: none; stroke: var(--border); stroke-width: 1.1; stroke-linejoin: round; }
+  .lbl-country { font-size: 12px; fill: var(--ink-2); }
+  .lbl-libya { font-size: 15px; font-weight: 700; fill: var(--ink-2); letter-spacing: .02em; }
+  .lbl-region { font-size: 11px; font-style: italic; fill: var(--grey-3); }
+  .lbl-sea { font-size: 12px; font-style: italic; fill: var(--grey-3); }
+  .lbl-mark { font-size: 12px; font-weight: 600; fill: var(--ink); paint-order: stroke; stroke: var(--bg); stroke-width: 3.5px; stroke-linejoin: round; pointer-events: none; }
+  .lbl-mark.is-land { stroke: var(--land); }
+  .lbl-dist { font-size: 12px; font-weight: 600; fill: var(--ink-2); paint-order: stroke; stroke: var(--bg); stroke-width: 4px; }
+  .dist { fill: none; stroke: var(--ink-2); stroke-width: 1; stroke-dasharray: 3 3; }
+  .zone { fill: url(#hatch); stroke: var(--grey-2); stroke-width: 1; stroke-dasharray: 3 2; cursor: pointer; }
+  .pulse { fill: none; stroke: var(--red); stroke-width: 1.5; pointer-events: none; }
+  .m { cursor: pointer; }
+  .dot-city { fill: var(--ink-2); }
+</style>
+</head>
+<body>
+<main class="radar">
+  <header>
+    <h1 class="r-title">La guerra in Ucraina arriva in Libia, tra le basi delle potenze straniere</h1>
+    <p class="r-sub">Gli attacchi ucraini contro navi russe, le aree controllate dai due governi rivali e le principali presenze militari straniere. Le sfumature indicano dove il controllo è incerto. Passa sui simboli, o toccali, per i dettagli</p>
+  </header>
+
+  <div class="r-pills" id="pills" role="group" aria-label="Filtra per categoria"></div>
+
+  <figure class="r-chart map-wrap" id="map" style="margin-top:14px"></figure>
+
+  <div class="r-key" id="key">
+    <span>Governo di Tripoli <i class="r-grad" aria-hidden="true"></i> Forze di Haftar</span>
+    <span><svg width="22" height="12" aria-hidden="true"><line x1="1" y1="6" x2="21" y2="6" style="stroke:var(--ink);stroke-width:1.5;stroke-dasharray:4 2.5"></line></svg>Linea del fronte dal 2020</span>
+    <span><svg width="12" height="12" aria-hidden="true"><circle cx="6" cy="6" r="4.5" style="fill:var(--bg);stroke:var(--red);stroke-width:2"></circle></svg>Posizione in mare indicativa</span>
+    <span><svg width="22" height="12" aria-hidden="true"><line x1="1" y1="6" x2="21" y2="6" style="stroke:var(--ink-2);stroke-dasharray:3 3"></line></svg>Distanza in linea d'aria</span>
+  </div>
+
+  <footer class="r-foot">
+    <span>Fonte: Reuters, Panel di esperti Onu sulla Libia (S/2026/224), Nga e Tearline, Congresso Usa, Asharq Al-Awsat, Agenzia Nova. Confini: Natural Earth</span>
+    <span>Elaborazione Radar – QN</span>
+  </footer>
+</main>
+
+<script>
+(function () {
+  var R = Radar, fmt = R.fmt;
+  var BASE = "../data/";
+  var BOX = { type: "MultiPoint", coordinates: [[9.3, 19.4], [26.3, 19.4], [26.3, 38.7], [9.3, 38.7]] };
+  var CAT = {
+    attacco: { label: "Attacchi", color: "var(--red)", shape: "circle" },
+    russia:  { label: "Russia", color: "var(--blue-1)", shape: "circle" },
+    turchia: { label: "Turchia", color: "var(--grey-2)", shape: "square" },
+    emirati: { label: "Emirati", color: "var(--grey-1)", shape: "diamond" },
+    italia:  { label: "Italia", color: "var(--blue-3)", shape: "triangle" },
+    ucraina: { label: "Ucraina", color: "var(--grey-2)", shape: "zone" }
+  };
+  var ORDER = ["attacco", "russia", "turchia", "emirati", "italia", "ucraina"];
+  var BENGASI = [20.07, 32.12], SIRACUSA = [15.29, 37.07];
+  var ZONE = { type: "Feature", properties: {}, geometry: { type: "Polygon", coordinates: [[[11.6, 33.1], [12.1, 32.93], [13.2, 32.9], [14.3, 32.65], [15.25, 32.35], [15.2, 31.9], [14.0, 31.6], [12.5, 31.7], [11.6, 32.3], [11.6, 33.1]]] } };
+  // Aree di controllo indicative: l'area di Haftar (est, centro con Sirte e Jufra, sud) è
+  // ritagliata sulla Libia; il confine interno viene sfumato perché fuori dalla costa non è netto.
+  var HAFTAR = { type: "Feature", properties: {}, geometry: { type: "Polygon", coordinates: [[[16.3, 34], [30, 34], [30, 15], [8, 15], [8, 29.4], [10, 29.5], [12.5, 29.3], [14.5, 29.6], [15.6, 30.3], [16.1, 30.95], [16.3, 31.26], [16.3, 34]]] } };
+  var FRONT = { type: "LineString", coordinates: [[16.3, 31.26], [16.1, 30.95], [15.95, 30.7]] };
+  var CTRL = {
+    e: { nome: "Forze di Khalifa Haftar", chi: "Esercito nazionale libico (Lna)", luogo: "Est, centro e sud", data: "",
+      descrizione: "Controllano l'est, il centro con Sirte e Jufra e quasi tutto il sud, fino ai confini con Sudan, Ciad, Niger e Algeria. Il governo dell'est è guidato da Osama Hammad. Nel sud il controllo è frammentato tra forze locali.",
+      fonte: "Asharq Al-Awsat, Congresso Usa" },
+    w: { nome: "Governo di Unità Nazionale", chi: "Guidato da Abdul Hamid Dbeibah", luogo: "Nord-ovest", data: "",
+      descrizione: "Riconosciuto dall'Onu, controlla il nord-ovest con Tripoli e Misurata. Dal cessate il fuoco del 2020 una linea di controllo a ovest di Sirte lo separa dalle forze di Haftar.",
+      fonte: "Congresso Usa, Reuters" }
+  };
+  var ZONE_INFO = {
+    nome: "Presenza ucraina", chi: "Secondo fonti della sicurezza libica", luogo: "Libia occidentale", data: "",
+    descrizione: "Due funzionari della sicurezza libica hanno riferito a Reuters che militari ucraini operano dalla Libia occidentale, addestrano forze vicine a Tripoli e conducono operazioni contro obiettivi russi. Il governo di Tripoli non lo nega, ma dice che non permetterà l'uso del suo territorio per attacchi.",
+    fonte: "Reuters"
+  };
+  var LABELS = [
+    { t: "Tunisia", c: [10.15, 33.05], k: "lbl-country", wide: true },
+    { t: "Egitto", c: [25.75, 27.0], k: "lbl-country", wide: true },
+    { t: "Niger", c: [12.4, 21.0], k: "lbl-country" },
+    { t: "Ciad", c: [19.6, 20.3], k: "lbl-country" },
+    { t: "Sudan", c: [25.7, 20.8], k: "lbl-country", wide: true },
+    { t: "Grecia", c: [22.3, 37.45], k: "lbl-country", wide: true },
+    { t: "Sicilia", c: [14.15, 37.58], k: "lbl-country" },
+    { t: "Malta", c: [14.95, 35.86], k: "lbl-country", wide: true, a: "start" },
+    { t: "Mar Mediterraneo", c: [21.0, 34.2], k: "lbl-sea", wide: true },
+    { t: "Golfo della Sirte", c: [18.3, 31.22], k: "lbl-sea", wide: true }
+  ];
+
+  function esc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]; }); }
+  function rewind(f) {   // anelli in senso orario per d3-geo
+    if (d3.geoArea(f) > 2 * Math.PI) f.geometry.coordinates.forEach(function (r) { r.reverse(); });
+    return f;
+  }
+  function shapePath(shape, s) {
+    if (shape === "square") return "M" + (-s) + "," + (-s) + "h" + 2 * s + "v" + 2 * s + "h" + (-2 * s) + "Z";
+    if (shape === "diamond") { var d = s * 1.3; return "M0," + (-d) + "L" + d + ",0L0," + d + "L" + (-d) + ",0Z"; }
+    if (shape === "triangle") { var t = s * 1.25; return "M0," + (-t) + "L" + t * 0.95 + "," + t * 0.7 + "L" + (-t * 0.95) + "," + t * 0.7 + "Z"; }
+    return d3.symbol(d3.symbolCircle, Math.PI * s * s)();
+  }
+
+  // Base cartografica: Natural Earth 1:50m, ritagliata sull'area della mappa (data/confini.json)
+  function loadBase() { return fetch(BASE + "libia-confini.json").then(function (r) { if (!r.ok) throw new Error("Confini non trovati"); return r.json(); }); }
+
+  Promise.all([R.loadCSV(BASE + "libia-luoghi.csv"), loadBase()]).then(function (res) {
+    var pts = res[0].map(function (r) {
+      return {
+        id: r.id, cat: r.categoria, chi: r.chi, nome: r.nome, luogo: r.luogo,
+        c: [R.num(r.lon), R.num(r.lat)], data: r.data, descrizione: r.descrizione, fonte: r.fonte,
+        ind: r.indicativo === "1", lab: r.etichetta, lx: R.num(r.lx) || 0, ly: R.num(r.ly) || 0,
+        anchor: r.ancora || "start", mobile: r.mobile === "1"
+      };
+    });
+    var base = res[1];
+    var host = document.getElementById("map");
+    var tip = R.tooltip(host);
+    var active = null, hovered = null;
+
+    var km = Math.round(d3.geoDistance(BENGASI, SIRACUSA) * 6371 / 10) * 10;
+
+    // ---- pulsanti-filtro (fanno anche da legenda) ----
+    var pills = d3.select("#pills");
+    function swatch(sel, cat, s) {
+      var c = CAT[cat];
+      var svg = sel.append("svg").attr("width", 14).attr("height", 14).attr("aria-hidden", "true");
+      if (c.shape === "zone") {
+        svg.append("rect").attr("x", 1.5).attr("y", 2.5).attr("width", 11).attr("height", 9).attr("rx", 1)
+          .style("fill", "none").style("stroke", c.color).style("stroke-dasharray", "2 1.5");
+      } else {
+        svg.append("path").attr("transform", "translate(7,7)").attr("d", shapePath(c.shape, s || 4.2)).style("fill", c.color);
+      }
+    }
+    var all = pills.append("button").attr("class", "r-pill").attr("type", "button").attr("aria-pressed", "true").text("Tutto")
+      .on("click", function () { setActive(null); });
+    ORDER.forEach(function (k) {
+      var b = pills.append("button").attr("class", "r-pill").attr("type", "button").attr("aria-pressed", "false").attr("data-cat", k)
+        .on("click", function () { setActive(active === k ? null : k); });
+      swatch(b, k);
+      b.append("span").text(CAT[k].label);
+    });
+
+    function setActive(k) {
+      active = k;
+      all.attr("aria-pressed", k ? "false" : "true");
+      pills.selectAll("button[data-cat]").attr("aria-pressed", function () { return this.getAttribute("data-cat") === k ? "true" : "false"; });
+      tip.hide(); hovered = null;
+      paint();
+    }
+
+    var svg, gMarks, gLabels, zonePath, distG;
+
+    function paint() {
+      if (!svg) return;
+      var focus = hovered ? null : active;
+      gMarks.selectAll(".m").classed("is-dimmed", function (d) {
+        if (hovered) return d.id !== hovered;
+        return focus ? d.cat !== focus : false;
+      });
+      gLabels.selectAll("text").classed("is-dimmed", function (d) {
+        if (hovered) return d.id !== hovered;
+        return focus ? d.cat !== focus : false;
+      });
+      zonePath.classed("is-dimmed", hovered ? hovered !== "zona" : (focus ? focus !== "ucraina" : false));
+      distG.classed("is-dimmed", !!(hovered || focus));
+    }
+
+    function tipFor(d) {
+      var rows = [["Chi", esc(d.chi)], ["Dove", esc(d.luogo)]];
+      if (d.data) rows.push(["Quando", esc(d.data)]);
+      var note = esc(d.descrizione) + "<br>Fonte: " + esc(d.fonte);
+      if (d.ind) note += "<br>Posizione in mare indicativa.";
+      return R.tipHTML({ title: esc(d.nome), rows: rows, note: note });
+    }
+
+    function draw(W, phase) {
+      var narrow = R.isNarrow(W);
+      var proj = d3.geoMercator().fitWidth(W, BOX);
+      var path = d3.geoPath(proj);
+      var bb = path.bounds(BOX), H = Math.ceil(bb[1][1] - bb[0][1]);
+      var MAXH = 820;
+      if (H > MAXH) {
+        var w2 = Math.floor(W * MAXH / H);
+        proj = d3.geoMercator().fitExtent([[(W - w2) / 2, 0], [(W + w2) / 2, MAXH]], BOX);
+        path = d3.geoPath(proj); H = MAXH;
+      }
+      proj.clipExtent([[0, 0], [W, H]]);
+      var s = narrow ? 4.2 : 5.2;
+
+      d3.select(host).selectAll("svg").remove();
+      svg = d3.select(host).append("svg").attr("width", W).attr("height", H)
+        .attr("role", "img")
+        .attr("aria-label", "Mappa della Libia divisa tra il governo di Tripoli e le forze di Haftar, con l'attacco ucraino a Bengasi del 22 novembre 2026, " +
+          pts.filter(function (d) { return d.cat === "russia"; }).length + " siti con presenza russa, " +
+          pts.filter(function (d) { return d.cat === "turchia"; }).length + " turca e la missione italiana. Bengasi dista " + fmt(km) + " km da Siracusa.");
+      svg.append("title").text("Attacchi ucraini e presenze militari straniere in Libia");
+      var defs = svg.append("defs");
+      var pat = defs.append("pattern").attr("id", "hatch").attr("width", 5).attr("height", 5).attr("patternUnits", "userSpaceOnUse").attr("patternTransform", "rotate(45)");
+      pat.append("line").attr("x1", 0).attr("y1", 0).attr("x2", 0).attr("y2", 5).style("stroke", "var(--grey-3)").style("stroke-width", 1).style("opacity", .55);
+
+      var gBase = svg.append("g");
+      gBase.append("path").datum(base.land).attr("class", "land").attr("d", path);
+      gBase.append("path").datum(base.libya).attr("class", "libya").attr("d", path);
+      var kpx = proj([11, 30])[0] - proj([10, 30])[0];   // pixel per grado
+      defs.append("clipPath").attr("id", "clip-libya").append("path").datum(base.libya).attr("d", path);
+      var blur = defs.append("filter").attr("id", "blur").attr("filterUnits", "userSpaceOnUse")
+        .attr("x", 0).attr("y", 0).attr("width", W).attr("height", H);
+      blur.append("feGaussianBlur").attr("stdDeviation", Math.max(6, kpx * 0.55));
+      gBase.append("g").attr("clip-path", "url(#clip-libya)")
+        .append("path").datum(HAFTAR).attr("class", "ctrl-e").attr("d", path).attr("filter", "url(#blur)");
+      gBase.append("path").datum(base.borders).attr("class", "borders").attr("d", path);
+      // aree sensibili al passaggio del cursore (Tripoli sotto, Haftar sopra)
+      var gHit = svg.append("g");
+      var hitW = gHit.append("path").datum(base.libya).attr("class", "ctrl-hit").attr("d", path);
+      var hitE = gHit.append("g").attr("clip-path", "url(#clip-libya)").append("path").datum(HAFTAR).attr("class", "ctrl-hit").attr("d", path);
+      [[hitW, CTRL.w], [hitE, CTRL.e]].forEach(function (h) {
+        h[0].on("pointerenter pointermove", function (ev) { var m = d3.pointer(ev, host); tip.show(tipFor(h[1]), m[0], m[1]); })
+          .on("pointerleave", function () { tip.hide(); })
+          .on("pointerdown", function (ev) { ev.stopPropagation(); var m = d3.pointer(ev, host); tip.show(tipFor(h[1]), m[0], m[1]); });
+      });
+      svg.append("path").datum(FRONT).attr("class", "front").attr("d", path);
+      [["Governo di Tripoli", [12.9, 30.6]], ["Forze di Haftar", [20.2, 27.3]]].forEach(function (l) {
+        var p = proj(l[1]);
+        svg.append("text").attr("class", "lbl-ctrl").attr("x", p[0]).attr("y", p[1]).attr("text-anchor", "middle")
+          .style("stroke", l[0] === "Forze di Haftar" ? "var(--ctrl-e)" : "var(--ctrl-w)").attr("aria-hidden", "true").text(l[0]);
+      });
+
+      var gTxt = svg.append("g").attr("aria-hidden", "true");
+      LABELS.filter(function (l) { return !(narrow && l.wide); }).forEach(function (l) {
+        var p = proj(l.c);
+        gTxt.append("text").attr("class", l.k).attr("x", p[0]).attr("y", p[1]).attr("text-anchor", l.a || "middle").text(l.t);
+      });
+
+      // zona ucraina
+      zonePath = svg.append("path").datum(ZONE).attr("class", "zone mark").attr("d", path)
+        .on("pointerenter pointermove", function (ev) { hovered = "zona"; paint(); var m = d3.pointer(ev, host); tip.show(tipFor(ZONE_INFO), m[0], m[1]); })
+        .on("pointerleave", function () { hovered = null; paint(); tip.hide(); });
+
+      // distanza Bengasi-Siracusa
+      distG = svg.append("g").attr("class", "mark");
+      var line = { type: "LineString", coordinates: [BENGASI, SIRACUSA] };
+      distG.append("path").datum(line).attr("class", "dist").attr("d", path);
+      var sp = proj(SIRACUSA), mid = proj(d3.geoInterpolate(BENGASI, SIRACUSA)(0.5));
+      distG.append("circle").attr("class", "dot-city").attr("cx", sp[0]).attr("cy", sp[1]).attr("r", 2.5);
+      distG.append("text").attr("class", "lbl-mark is-land").attr("x", sp[0] + 7).attr("y", sp[1] + 4).text("Siracusa");
+      distG.append("text").attr("class", "lbl-dist").attr("x", mid[0] + 8).attr("y", mid[1]).text(fmt(km) + " km");
+
+      // simboli
+      gMarks = svg.append("g");
+      var order = pts.slice().sort(function (a, b) { return (a.cat === "attacco") - (b.cat === "attacco"); });
+      var mk = gMarks.selectAll("g.m").data(order).join("g").attr("class", "m mark")
+        .attr("transform", function (d) { var p = proj(d.c); return "translate(" + p[0] + "," + p[1] + ")"; })
+        .attr("tabindex", 0).attr("role", "button")
+        .attr("aria-label", function (d) { return d.nome + ", " + d.luogo; });
+      mk.append("circle").attr("r", 13).attr("class", "hit");
+      var sym = mk.append("path").attr("class", "sym")
+        .attr("d", function (d) { return shapePath(CAT[d.cat].shape, d.cat === "attacco" ? s + 1.3 : s); })
+        .style("fill", function (d) { return d.ind ? "var(--bg)" : CAT[d.cat].color; })
+        .style("stroke", function (d) { return d.ind ? CAT[d.cat].color : "var(--bg)"; })
+        .style("stroke-width", function (d) { return d.ind ? 2 : 1; });
+
+      R.enter(sym, phase,
+        function (sel) { sel.attr("opacity", 0); },
+        function (sel) { sel.attr("opacity", 1); },
+        function (d, i) { return 0; });
+      if (phase === "play") sym.transition().delay(function (d, i) { return d.cat === "attacco" ? 500 : i * 30; }).duration(R.DUR).attr("opacity", 1);
+
+      // impulso sull'attacco principale, una volta
+      var merk = pts.filter(function (d) { return d.id === "merkury"; })[0];
+      if (merk && phase === "play" && !R.reduced) {
+        var mp = proj(merk.c);
+        svg.append("circle").attr("class", "pulse").attr("cx", mp[0]).attr("cy", mp[1]).attr("r", s)
+          .transition().delay(900).duration(1100).ease(d3.easeCubicOut).attr("r", s * 5).style("opacity", 0).remove();
+      }
+
+      // etichette dirette
+      gLabels = svg.append("g").attr("aria-hidden", "true");
+      gLabels.selectAll("text").data(pts.filter(function (d) { return d.lab && (!narrow || d.mobile); })).join("text")
+        .attr("class", "lbl-mark mark")
+        .attr("x", function (d) { return proj(d.c)[0] + d.lx; })
+        .attr("y", function (d) { return proj(d.c)[1] + d.ly; })
+        .attr("text-anchor", function (d) { return d.anchor; })
+        .text(function (d) { return d.lab; })
+        .each(function (d) { this.__lab = true; })
+        .each(function (d) {   // se l'etichetta esce dal riquadro, la sposta dall'altro lato del simbolo
+          var b = this.getBBox(), px = proj(d.c)[0];
+          var py = proj(d.c)[1];
+          if (b.x + b.width > W - 2) d3.select(this).attr("text-anchor", "end").attr("x", px + 5).attr("y", py - 10);
+          else if (b.x < 2) d3.select(this).attr("text-anchor", "start").attr("x", px + Math.abs(d.lx || 9));
+        });
+
+      gLabels.selectAll("text").each(function () {   // alone del colore dell'area su cui cade l'etichetta
+        var b = this.getBBox(), g = proj.invert([b.x + b.width / 2, b.y + b.height / 2]);
+        var col = !d3.geoContains(base.libya, g) ? "var(--bg)" : (d3.geoContains(HAFTAR, g) ? "var(--ctrl-e)" : "var(--ctrl-w)");
+        d3.select(this).style("stroke", col);
+      });
+      function on(ev, d) {
+        hovered = d.id; paint();
+        var p = proj(d.c);
+        tip.show(tipFor(d), p[0], p[1]);
+      }
+      mk.on("pointerenter", on).on("focus", on)
+        .on("pointerleave blur", function () { hovered = null; paint(); tip.hide(); })
+        .on("pointerdown", function (ev, d) { ev.stopPropagation(); on(ev, d); });
+      paint();
+    }
+
+    R.dismissOutside(host, function () { hovered = null; paint(); tip.hide(); });
+    R.responsive(host, draw);
+  }).catch(function (e) { R.fail(document.getElementById("map"), e); });
+})();
+</script>
+</body>
+</html>
