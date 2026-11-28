@@ -1,0 +1,194 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sepoltura degli animali d'affezione, le regole per Regione – Radar QN</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Libre+Franklin:wght@400;500;600;700&family=Newsreader:opsz,wght@6..72,400;6..72,700&display=swap">
+<link rel="stylesheet" href="../assets/radar.css">
+<script src="https://cdn.jsdelivr.net/npm/d3@7"></script>
+<script src="../assets/radar.js"></script>
+<style>
+  .lay { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr); gap: 18px; margin-top: 18px; align-items: start; }
+  .side { display: flex; flex-direction: column; gap: 14px; }
+  .bign { display: flex; align-items: last baseline; gap: 10px; }
+  .bign b { font-weight: 700; font-size: 54px; line-height: .9; color: var(--blue); letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
+  .bign span { font-size: 13px; line-height: 1.3; color: var(--ink-2); }
+  .leg { display: flex; flex-direction: column; gap: 4px; }
+  .leg button { font: inherit; font-size: 13px; color: var(--ink); background: none; border: 0; padding: 4px 6px; margin: 0 -6px; border-radius: 6px; display: flex; align-items: center; gap: 8px; cursor: pointer; text-align: left; }
+  .leg button:hover { background: color-mix(in srgb, var(--ink) 5%, transparent); }
+  .leg button[aria-pressed="false"] { opacity: .45; }
+  .leg i { width: 14px; height: 14px; border-radius: 3px; flex: none; box-sizing: border-box; }
+  .leg small { margin-left: auto; color: var(--ink-2); font-variant-numeric: tabular-nums; }
+  .leg .pts { display: flex; gap: 14px; flex-wrap: wrap; font-size: 12px; color: var(--ink-2); margin-top: 4px; }
+  .leg .pts span { display: inline-flex; align-items: center; gap: 6px; }
+  .card { background: color-mix(in srgb, var(--ink) 5%, var(--bg)); border-radius: 8px; padding: 12px 14px; min-height: 150px; box-sizing: border-box; }
+  .card h3 { margin: 0; font-family: var(--serif); font-weight: 700; font-size: 20px; line-height: 1.1; color: var(--title); }
+  .card .cat { display: inline-block; font-size: 11px; font-weight: 600; border-radius: 999px; padding: 1px 8px; margin: 6px 0 8px; border: 1px solid currentColor; }
+  .card dl { margin: 0; font-size: 13px; line-height: 1.38; }
+  .card dt { font-weight: 700; margin-top: 6px; color: var(--ink); }
+  .card dd { margin: 1px 0 0; color: var(--ink-2); }
+  .card .hint { font-size: 13px; color: var(--ink-2); line-height: 1.4; }
+  .reg { stroke: var(--bg); stroke-width: 0.9; cursor: pointer; transition: opacity 200ms ease; }
+  .reg.is-dimmed { opacity: .25; }
+  .reg-hl { fill: none; stroke: var(--ink); stroke-width: 1.8; pointer-events: none; }
+  .lp { cursor: pointer; }
+  .lp.is-dimmed { opacity: .2; }
+  @media (max-width: 599px) {
+    .lay { grid-template-columns: 1fr; }
+    .bign b { font-size: 44px; }
+  }
+</style>
+</head>
+<body>
+<main class="radar">
+  <header>
+    <h1 class="r-title">Sepolti accanto al padrone: si può in sette Regioni</h1>
+    <p class="r-sub">Le norme regionali sulla sepoltura degli animali d'affezione, con alcuni cimiteri per animali e Comuni che accolgono le ceneri accanto al proprietario</p>
+  </header>
+
+  <div class="lay">
+    <figure class="r-chart" id="map" style="margin:0"></figure>
+    <div class="side">
+      <div class="bign" aria-hidden="true"><b id="big">0</b><span id="big-l"></span></div>
+      <div class="leg" id="leg"></div>
+      <div class="card" id="card" aria-live="polite"></div>
+    </div>
+  </div>
+
+  <p class="r-note">Passa il cursore o tocca una Regione per le norme, un simbolo per il luogo. I punti indicano alcuni luoghi noti, non tutti quelli esistenti. Non c'è una legge nazionale: dove non risultano norme regionali specifiche valgono le regole sanitarie europee.</p>
+
+  <footer class="r-foot">
+    <span>Fonte: bollettini ufficiali e consigli regionali, Comuni, Agi</span>
+    <span>Elaborazione Radar – QN</span>
+  </footer>
+</main>
+
+<script>
+(function () {
+  var R = Radar;
+  var CATS = [
+    { k: "Ceneri nella tomba del proprietario", c: "var(--blue)" },
+    { k: "Solo regole sui cimiteri per animali", c: "var(--blue-light)" },
+    { k: "Regole sanitarie generali", c: "color-mix(in srgb, var(--ink) 9%, var(--bg))" }
+  ];
+  var C = {}; CATS.forEach(function (c) { C[c.k] = c; });
+  var active = {}; CATS.forEach(function (c) { active[c.k] = true; });
+  var DIAMOND = "M0,-5L5,0L0,5L-5,0Z";
+
+  Promise.all([d3.json("../data/animali-regioni.geojson"), R.loadCSV("../data/animali-sepoltura-regioni.csv"), R.loadCSV("../data/animali-sepoltura-luoghi.csv")])
+  .then(function (res) {
+    var geo = res[0], info = {};
+    res[1].forEach(function (r) { info[r["Regione"]] = { cat: r["Categoria"], ceneri: r["Ceneri"], cimiteri: r["Cimiteri"], prop: r["Proposta"] }; });
+    geo.features.forEach(function (f) { f.info = info[f.properties.name] || { cat: "Regole sanitarie generali" }; });
+    var luoghi = res[2].map(function (r) { return { nome: r["Nome"], luogo: r["Luogo"], tipo: r["Tipo"], lon: parseFloat(r["Lon"]), lat: parseFloat(r["Lat"]), nota: r["Nota"] }; });
+    luoghi.forEach(function (l) { var f = geo.features.find(function (f) { return d3.geoContains(f, [l.lon, l.lat]); }); l.reg = f ? f.properties.name : null; });
+
+    var count = function (k) { return geo.features.filter(function (f) { return f.info.cat === k; }).length; };
+    var nCen = count(CATS[0].k);
+    d3.select("#big-l").text("Regioni su " + geo.features.length + " consentono di mettere le ceneri dell'animale nella tomba del proprietario");
+    var f0 = function (v) { return R.fmt(v, 0); };
+    if (R.reduced) d3.select("#big").text(f0(nCen));
+    else R.onFirstView(document.getElementById("big"), function () { R.countUp(d3.select("#big"), nCen, f0, "play"); });
+
+    // legenda-filtro
+    var leg = d3.select("#leg");
+    var lb = leg.selectAll("button").data(CATS).join("button").attr("type", "button").attr("aria-pressed", "true");
+    lb.append("i").style("background", function (c) { return c.c; })
+      .style("border", function (c) { return c.k.indexOf("Proposta") === 0 ? "1.5px dashed var(--grey-2)" : "none"; });
+    lb.append("span").text(function (c) { return c.k; });
+    lb.append("small").text(function (c) { return count(c.k); });
+    var pts = leg.append("div").attr("class", "pts");
+    pts.append("span").html('<svg width="10" height="10" viewBox="-5 -5 10 10"><circle r="4" style="fill:var(--ink);stroke:var(--bg);stroke-width:1.2"/></svg>Cimitero per animali (' + luoghi.filter(function (l) { return l.tipo === "Cimitero per animali"; }).length + ")");
+    pts.append("span").html('<svg width="12" height="12" viewBox="-6 -6 12 12"><path d="' + DIAMOND + '" style="fill:var(--bg);stroke:var(--ink);stroke-width:1.6"/></svg>Comune che accoglie le ceneri (' + luoghi.filter(function (l) { return l.tipo !== "Cimitero per animali"; }).length + ")");
+
+    var card = d3.select("#card");
+    function showDefault() {
+      card.html("");
+      card.append("div").attr("class", "hint").text("Passa sopra una Regione per leggere le sue norme. Le Regioni in blu scuro permettono di tumulare le ceneri dell'animale nel loculo o nella tomba di famiglia del proprietario, in un'urna separata.");
+    }
+    function showRegion(f) {
+      var i = f.info, c = C[i.cat];
+      card.html("");
+      card.append("h3").text(f.properties.name);
+      card.append("span").attr("class", "cat").style("color", i.cat === CATS[0].k ? "var(--blue)" : "var(--ink-2)").text(i.cat);
+      var dl = card.append("dl");
+      function item(t, v) { if (v) { dl.append("dt").text(t); dl.append("dd").text(v); } }
+      item("Ceneri con il proprietario", i.ceneri);
+      item("Cimiteri per animali", i.cimiteri);
+      item("Proposte", i.prop);
+      if (!i.ceneri && !i.cimiteri && !i.prop) item("Norme", "Non risultano norme regionali specifiche: valgono le regole sanitarie europee sui sottoprodotti di origine animale");
+      var here = luoghi.filter(function (l) { return l.reg === f.properties.name; });
+      if (here.length) item("Luoghi sulla mappa", here.map(function (l) { return l.tipo === "Cimitero per animali" ? l.nome + " (" + l.luogo + ")" : "Comune di " + l.luogo; }).join("; "));
+      R.scheduleHeight();
+    }
+    showDefault();
+
+    var host = document.getElementById("map");
+    var tip = R.tooltip(host);
+    var regs = d3.select(null), lps = d3.select(null), hl = d3.select(null);
+    function refresh() {
+      regs.classed("is-dimmed", function (f) { return !active[f.info.cat]; });
+    }
+    lb.on("click", function (ev, c) {
+      var allOn = CATS.every(function (q) { return active[q.k]; });
+      if (allOn) CATS.forEach(function (q) { active[q.k] = q.k === c.k; }); else active[c.k] = !active[c.k];
+      if (!CATS.some(function (q) { return active[q.k]; })) CATS.forEach(function (q) { active[q.k] = true; });
+      lb.attr("aria-pressed", function (q) { return active[q.k] ? "true" : "false"; });
+      refresh();
+    });
+
+    R.responsive(host, function (W, phase) {
+      var H = Math.round(W * 1.18);
+      var proj = d3.geoMercator().fitExtent([[4, 4], [W - 4, H - 4]], geo);
+      var path = d3.geoPath(proj);
+      d3.select(host).select("svg").remove();
+      var svg = d3.select(host).insert("svg", ".r-tip").attr("width", W).attr("height", H).attr("role", "img")
+        .attr("aria-label", "Mappa delle Regioni italiane: " + nCen + " consentono le ceneri dell'animale nella tomba del proprietario (" +
+          geo.features.filter(function (f) { return f.info.cat === CATS[0].k; }).map(function (f) { return f.properties.name; }).join(", ") + ").");
+      svg.append("title").text("Norme regionali sulla sepoltura degli animali d'affezione");
+      regs = svg.append("g").selectAll("path").data(geo.features).join("path").attr("class", "reg mark")
+        .attr("d", path).style("fill", function (f) { return C[f.info.cat].c; });
+      svg.append("g").selectAll("path").data(geo.features.filter(function (f) { return f.info.cat.indexOf("Proposta") === 0; })).join("path")
+        .attr("d", path).style("fill", "none").style("stroke", "var(--grey-2)").style("stroke-width", 1.2).style("stroke-dasharray", "3 2").style("pointer-events", "none");
+      hl = svg.append("path").attr("class", "reg-hl");
+      refresh();
+      R.enter(regs, phase, function (s) { s.style("opacity", 0); }, function (s) { s.style("opacity", null); });
+
+      regs.on("pointerenter pointerdown", function (ev, f) {
+        hl.attr("d", path(f)).style("opacity", 1);
+        showRegion(f);
+        var c = path.centroid(f);
+        tip.show(R.tipHTML({ title: f.properties.name, value: null, rows: [["Regola", f.info.cat]] }), c[0], c[1]);
+      }).on("pointerleave", function (ev) {
+        if (ev.pointerType === "mouse") { hl.style("opacity", 0); tip.hide(); }
+      });
+
+      var r0 = R.isNarrow(W) ? 3.2 : 4;
+      lps = svg.append("g").selectAll("g").data(luoghi).join("g").attr("class", "lp")
+        .attr("transform", function (l) { var p = proj([l.lon, l.lat]); return "translate(" + p[0] + "," + p[1] + ")"; });
+      lps.each(function (l) {
+        var g = d3.select(this);
+        if (l.tipo === "Cimitero per animali") g.append("circle").attr("r", r0).style("fill", "var(--ink)").style("stroke", "var(--bg)").style("stroke-width", 1.2);
+        else g.append("path").attr("d", DIAMOND).attr("transform", "scale(" + (r0 / 4) + ")").style("fill", "var(--bg)").style("stroke", "var(--ink)").style("stroke-width", 1.6);
+        g.append("circle").attr("r", 9).style("fill", "transparent");
+      });
+      R.enter(lps, phase, function (s) { s.style("opacity", 0); }, function (s) { s.style("opacity", 1); }, R.DUR * 0.6);
+      lps.on("pointerenter pointerdown", function (ev, l) {
+        ev.stopPropagation();
+        lps.classed("is-dimmed", function (q) { return q !== l; });
+        var p = proj([l.lon, l.lat]);
+        tip.show(R.tipHTML({ title: l.tipo === "Cimitero per animali" ? l.nome : "Comune di " + l.nome, value: null,
+          rows: [["Luogo", l.luogo], ["Tipo", l.tipo]], note: l.nota || null }), p[0], p[1]);
+      }).on("pointerleave", function (ev) {
+        if (ev.pointerType === "mouse") { lps.classed("is-dimmed", false); tip.hide(); }
+      });
+      R.dismissOutside(host, function () { tip.hide(); hl.style("opacity", 0); lps.classed("is-dimmed", false); showDefault(); });
+    });
+  }).catch(function (e) { R.fail("#map", e); });
+})();
+</script>
+</body>
+</html>

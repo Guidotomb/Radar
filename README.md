@@ -8,6 +8,9 @@ Indice con anteprime e snippet: https://guidotomb.github.io/Radar/
 
 | Dataviz | URL | Dati | Fonte | Note |
 |---|---|---|---|---|
+| Trentacinque anni di leggi sugli animali di casa | https://guidotomb.github.io/Radar/animali-leggi/ | `data/animali-tappe.csv` | Normattiva; Camera dei deputati; Senato della Repubblica; bollettini regionali | Solo norme in vigore: leggi nazionali e norme regionali sulla sepoltura. Dal 2015 l'asse del tempo si allarga (segnalato nel grafico). Lombardia 2019: norma impugnata dal governo, operativa con il regolamento regionale 4/2022. |
+| Più tutele per gli animali, nessun permesso per chi li perde | https://guidotomb.github.io/Radar/animali-tutele/ | `data/animali-tutele.csv` | Normattiva; Camera dei deputati; Senato della Repubblica; bollettini regionali | Tutele in vigore in tutta Italia, solo in alcune Regioni e proposte non ancora approvate (C. 2453 Dori, C. 2187 Zanella e abbinate, C. 2525 Cherchi, proposte regionali in Veneto). Esclusi gli accordi aziendali. |
+| Sepolti accanto al padrone: si può in sette Regioni | https://guidotomb.github.io/Radar/animali-sepoltura/ | `data/animali-sepoltura-regioni.csv, data/animali-sepoltura-luoghi.csv, data/animali-regioni.geojson` | Bollettini ufficiali e consigli regionali; Comuni; Agi; confini regionali Istat | Ceneri con il proprietario: Lombardia, Piemonte, Liguria, Abruzzo, Toscana, Campania, Umbria. In grigio le Regioni dove non risultano norme specifiche. Cimiteri e Comuni: selezione di luoghi noti, coordinate indicative. Confini semplificati. |
 | La guerra in Ucraina arriva in Libia, tra le basi delle potenze straniere | https://guidotomb.github.io/Radar/libia-mappa/ | `data/libia-luoghi.csv, data/libia-confini.json` | Reuters; Panel di esperti Onu sulla Libia (S/2026/224); Nga e Tearline; Congresso Usa; Asharq Al-Awsat; Agenzia Nova; confini Natural Earth | Aree di controllo indicative (sfumate dove il controllo è incerto); linea del fronte a ovest di Sirte. Posizioni in mare di Angara e Arctic Metagaz indicative. Presenza ucraina secondo fonti della sicurezza libica (Reuters). Distanza Bengasi–Siracusa calcolata. |
 | Per 755 comuni italiani Bengasi è più vicina di Milano | https://guidotomb.github.io/Radar/libia-distanze/ | `data/libia-distanze-comuni.csv, data/libia-confini.json` | Istat, confini dei comuni al 1° gennaio 2026; Natural Earth | Distanze in linea d'aria (sfera, raggio 6.371 km) dal centroide geometrico di ogni comune al porto di Bengasi (32,11 N; 20,06 E): calcolo Radar. Milano e Roma: centroidi dei due comuni. Il numero nel titolo è calcolato dal CSV. |
 | Migranti, gas e soldati: gli interessi italiani in Libia passano da Tripoli | https://guidotomb.github.io/Radar/libia-italia/ | `data/libia-italia.csv` | Unhcr, Agi, Ice, ItaliaOggi, Eni, Agenzia Nova, Euronews | Interscambio gennaio-aprile 2025 ricavato dalla crescita del 29,5% del 2026 (ItaliaOggi). Quota Libia sugli arrivi: Unhcr, primi otto mesi 2026. |
@@ -32,6 +35,33 @@ Ogni pagina legge il proprio CSV da `data/` (separatore `;`, virgola decimale, U
 ## Snippet per il CMS
 
 Lo script va incollato inline (mai richiamato da un file esterno). Se in un articolo ci sono più dataviz, può restare in ognuna: si attiva una volta sola.
+
+### Trentacinque anni di leggi sugli animali di casa
+
+```html
+<iframe src="https://guidotomb.github.io/Radar/animali-leggi/" width="100%" height="780" frameborder="0" scrolling="no" title="Trentacinque anni di leggi sugli animali di casa"></iframe>
+<script>
+(function(){if(window.__radarQNv2)return;window.__radarQNv2=1;var O="https://guidotomb.github.io";var MQ=window.matchMedia("(prefers-color-scheme:dark)");function frames(){return Array.prototype.filter.call(document.getElementsByTagName("iframe"),function(f){return(f.getAttribute("src")||"").indexOf(O+"/")===0;});}function theme(){var t=document.documentElement.getAttribute("data-theme");return t==="dark"||t==="light"?t:(MQ.matches?"dark":"light");}function bgOf(el){for(;el&&el.nodeType===1;el=el.parentElement){var c=getComputedStyle(el).backgroundColor;if(c&&c !=="transparent"&&!/rgba\([^)]*,\s*0\)$/.test(c))return c;}return null;}function send(f){try{f.contentWindow.postMessage({sentinel:"radar-qn",type:"theme",theme:theme(),bg:bgOf(f.parentElement)},O);}catch(e){}}function sendAll(){frames().forEach(send);}window.addEventListener("message",function(e){if(e.origin !==O)return;var d=e.data;if(!d||d.sentinel !=="radar-qn"||d.type !=="height")return;frames().forEach(function(f){if(f.contentWindow !==e.source)return;var h=Math.ceil(+d.height);if(h > 0&&20000 > h)f.style.height=h+"px";send(f);});});new MutationObserver(function(){sendAll();setTimeout(sendAll,400);}).observe(document.documentElement,{attributes:true,attributeFilter:["data-theme"]});if(MQ.addEventListener)MQ.addEventListener("change",sendAll);})();
+</script>
+```
+
+### Più tutele per gli animali, nessun permesso per chi li perde
+
+```html
+<iframe src="https://guidotomb.github.io/Radar/animali-tutele/" width="100%" height="1530" frameborder="0" scrolling="no" title="Più tutele per gli animali, nessun permesso per chi li perde"></iframe>
+<script>
+(function(){if(window.__radarQNv2)return;window.__radarQNv2=1;var O="https://guidotomb.github.io";var MQ=window.matchMedia("(prefers-color-scheme:dark)");function frames(){return Array.prototype.filter.call(document.getElementsByTagName("iframe"),function(f){return(f.getAttribute("src")||"").indexOf(O+"/")===0;});}function theme(){var t=document.documentElement.getAttribute("data-theme");return t==="dark"||t==="light"?t:(MQ.matches?"dark":"light");}function bgOf(el){for(;el&&el.nodeType===1;el=el.parentElement){var c=getComputedStyle(el).backgroundColor;if(c&&c !=="transparent"&&!/rgba\([^)]*,\s*0\)$/.test(c))return c;}return null;}function send(f){try{f.contentWindow.postMessage({sentinel:"radar-qn",type:"theme",theme:theme(),bg:bgOf(f.parentElement)},O);}catch(e){}}function sendAll(){frames().forEach(send);}window.addEventListener("message",function(e){if(e.origin !==O)return;var d=e.data;if(!d||d.sentinel !=="radar-qn"||d.type !=="height")return;frames().forEach(function(f){if(f.contentWindow !==e.source)return;var h=Math.ceil(+d.height);if(h > 0&&20000 > h)f.style.height=h+"px";send(f);});});new MutationObserver(function(){sendAll();setTimeout(sendAll,400);}).observe(document.documentElement,{attributes:true,attributeFilter:["data-theme"]});if(MQ.addEventListener)MQ.addEventListener("change",sendAll);})();
+</script>
+```
+
+### Sepolti accanto al padrone: si può in sette Regioni
+
+```html
+<iframe src="https://guidotomb.github.io/Radar/animali-sepoltura/" width="100%" height="730" frameborder="0" scrolling="no" title="Sepolti accanto al padrone: si può in sette Regioni"></iframe>
+<script>
+(function(){if(window.__radarQNv2)return;window.__radarQNv2=1;var O="https://guidotomb.github.io";var MQ=window.matchMedia("(prefers-color-scheme:dark)");function frames(){return Array.prototype.filter.call(document.getElementsByTagName("iframe"),function(f){return(f.getAttribute("src")||"").indexOf(O+"/")===0;});}function theme(){var t=document.documentElement.getAttribute("data-theme");return t==="dark"||t==="light"?t:(MQ.matches?"dark":"light");}function bgOf(el){for(;el&&el.nodeType===1;el=el.parentElement){var c=getComputedStyle(el).backgroundColor;if(c&&c !=="transparent"&&!/rgba\([^)]*,\s*0\)$/.test(c))return c;}return null;}function send(f){try{f.contentWindow.postMessage({sentinel:"radar-qn",type:"theme",theme:theme(),bg:bgOf(f.parentElement)},O);}catch(e){}}function sendAll(){frames().forEach(send);}window.addEventListener("message",function(e){if(e.origin !==O)return;var d=e.data;if(!d||d.sentinel !=="radar-qn"||d.type !=="height")return;frames().forEach(function(f){if(f.contentWindow !==e.source)return;var h=Math.ceil(+d.height);if(h > 0&&20000 > h)f.style.height=h+"px";send(f);});});new MutationObserver(function(){sendAll();setTimeout(sendAll,400);}).observe(document.documentElement,{attributes:true,attributeFilter:["data-theme"]});if(MQ.addEventListener)MQ.addEventListener("change",sendAll);})();
+</script>
+```
 
 ### La guerra in Ucraina arriva in Libia, tra le basi delle potenze straniere
 
