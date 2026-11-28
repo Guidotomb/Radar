@@ -139,7 +139,7 @@
           n.append("b").text("Nessuna legge");
           n.append("span").text("nessun permesso per la malattia o la morte dell'animale");
         }
-        if (!items.length && col === 1) { s.classed("stack--empty", true); s.append("div").attr("class", "empty").text("Nessuna proposta in questo schema"); }
+        if (!items.length && col === 1) { s.classed("stack--empty", true); s.append("div").attr("class", "empty").text("Nessuna proposta"); }
         items.forEach(function (d) {
           var c = s.append("div").datum(d).attr("class", "c mark c--" + ST[d.stato].cls).attr("tabindex", 0)
             .attr("aria-label", d.t + ". " + d.stato + ". " + d.norma + ". " + d.det);
